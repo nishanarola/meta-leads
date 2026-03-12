@@ -318,8 +318,8 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
             all_display = pd.concat(list(project_dfs.values()), ignore_index=True) if project_dfs else pd.DataFrame()
             st.success(f"✅ {len(all_display)} leads found for {date_label}")
 
-           st.divider()
-            # લાઈન 322: સ્પેલિંગ સુધારો (save_dir)
+           # લાઇન ૩૨૧ થી રિપ્લેસ કરો
+            st.divider()
             save_dir = None 
             try:
                 month_folder = target_date.strftime('%B_%Y')
@@ -331,16 +331,15 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
             st.subheader("📥 Download PDFs")
             saved_files = []
             
-            # લાઈન 325: ડેટા કલેક્શન ચેક કરો
             for idx, project_name in enumerate(project_dfs.keys()):
                 sdf = project_dfs[project_name]
                 
-                # ખાતરી કરો કે sdf એક DataFrame જ છે (TypeError ફિક્સ)
+                # TypeError અટકાવવા માટે ચેક
                 if not isinstance(sdf, pd.DataFrame):
                     continue
                     
                 try:
-                    # PDF જનરેટ કરો
+                    # PDF જનરેટ કરો (font_size એરર સોલ્વ કરવા માટે generate_pdf માં ફેરફાર જરૂરી છે)
                     pdf_bytes = generate_pdf(
                         sdf.drop(columns=['Project'], errors='ignore'),
                         date_label,
@@ -351,14 +350,12 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
                         safe_name = project_name.replace(' ', '-')
                         fname = f"{safe_name}-({date_label})_{len(sdf)}leads.pdf"
                         
-                        # લાઈન 336: અહીં 'save_dir' વેરિએબલ સાચો હોવો જોઈએ
                         if save_dir:
                             file_path = os.path.join(save_dir, fname)
                             with open(file_path, 'wb') as f:
                                 f.write(pdf_bytes)
                             saved_files.append(fname)
                         
-                        # ડાઉનલોડ બટન
                         st.download_button(
                             label=f"📥 {project_name} ({len(sdf)} leads)",
                             data=pdf_bytes,
@@ -367,6 +364,7 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
                             key=f"pdf_btn_{idx}"
                         )
                 except Exception as ex:
+                    # image_041056.png મુજબની એરર અહીં દેખાશે
                     st.error(f"PDF error for {project_name}: {ex}")
 
             if saved_files and save_dir:
