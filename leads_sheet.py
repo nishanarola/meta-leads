@@ -181,6 +181,7 @@ def load_all_sheets(sheet_names_list, auto_fetch_all):
                 df['created_dt'] = parse_to_ist(df['created_time'])
                 df['created_time'] = df['created_dt'].dt.strftime('%d-%m-%Y')
                 df['Project'] = ws.title
+                df['campaign_name'] = ws.title
                 df['_spreadsheet'] = spreadsheet_name
                 if 'campaign_name' in df.columns:
                     df['campaign_name'] = ws.title.astype(str).str.split('|').str[0].str.strip()
