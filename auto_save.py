@@ -198,10 +198,8 @@ def main():
     ist = pytz.timezone('Asia/Kolkata')
     now_ist = datetime.now(ist)
 
-    # ── MANUAL DATE — demo mate change karo, normally comment rakho ──
-    # MANUAL_DATE = "10-03-2026"  # DD-MM-YYYY format ma lakho
-    MANUAL_DATE = None            # Normal mode — yesterday auto lese
-    # ────────────────────────────────────────────────────────────────
+
+    MANUAL_DATE = None           
 
     if MANUAL_DATE:
         yesterday = datetime.strptime(MANUAL_DATE, "%d-%m-%Y").date()
@@ -209,9 +207,8 @@ def main():
     else:
         yesterday = (now_ist - timedelta(1)).date()
 
-    # ── Folder structure: SAVE_FOLDER / March_2026 / 10-03-2026 /
-    month_folder = yesterday.strftime('%B_%Y')        # e.g. March_2026
-    date_folder  = yesterday.strftime('%d-%m-%Y')     # e.g. 10-03-2026
+    month_folder = yesterday.strftime('%B_%Y')        
+    date_folder  = yesterday.strftime('%d-%m-%Y')     
     save_path = os.path.join(SAVE_FOLDER, month_folder, date_folder)
     os.makedirs(save_path, exist_ok=True)
 
