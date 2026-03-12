@@ -16,7 +16,6 @@ load_dotenv()
 st.set_page_config(page_title="Enacle", page_icon="🏠", layout="wide")
 st.title("🏠 Enacle — Yesterday's Leads Report")
 
-# ── SPREADSHEET NAMES FILE ───────────────────────────────────────────────────
 SHEETS_CONFIG_FILE = "sheets_config.json"
 
 def load_sheet_names():
@@ -33,7 +32,6 @@ def save_sheet_names(names, auto_fetch):
     with open(SHEETS_CONFIG_FILE, "w") as f:
         json.dump({"sheets": names, "auto_fetch": auto_fetch}, f, indent=2)
 
-# ── FONT ─────────────────────────────────────────────────────────────────────
 FONT_PATH = "NotoSansGujarati.ttf"
 
 def download_font():
@@ -55,7 +53,6 @@ def download_font():
 
 FONT_AVAILABLE = download_font()
 
-# ── PDF GENERATE ─────────────────────────────────────────────────────────────
 def generate_pdf(df, report_date, title="Leads Report"):
     pdf = FPDF(orientation='L', unit='mm', format='A4')
     pdf.add_page()
@@ -81,27 +78,33 @@ def generate_pdf(df, report_date, title="Leads Report"):
             else: col_widths.append(25)
         col_widths = [w * page_width / sum(col_widths) for w in col_widths]
         pdf.set_font(font_name, size=9)
-        header_height = 18
+        header_height = 22
         start_y = pdf.get_y()
-        def split_2lines(text, limit=18):
+
+        def split_3lines(text, limit=14):
             text = str(text)
             if len(text) <= limit:
-                return text, ""
-            mid = len(text) // 2
-            return text[:mid].strip(), text[mid:mid*2].strip()
+                return text, "", ""
+            third = len(text) // 3
+            return text[:third].strip(), text[third:third*2].strip(), text[third*2:].strip()
+
         for i, col in enumerate(df.columns):
-            line1, line2 = split_2lines(col)
+            line1, line2, line3 = split_3lines(col)
             x = pdf.get_x()
             y = start_y
             pdf.set_fill_color(52, 73, 94)
             pdf.rect(x, y, col_widths[i], header_height, 'FD')
             pdf.set_text_color(255, 255, 255)
-            pdf.set_xy(x, y + 3)
-            pdf.cell(col_widths[i], 6, line1, 0, 0, 'C')
+            pdf.set_xy(x, y + 2)
+            pdf.cell(col_widths[i], 5, line1, 0, 0, 'C')
             if line2:
-                pdf.set_xy(x, y + 10)
-                pdf.cell(col_widths[i], 6, line2, 0, 0, 'C')
+                pdf.set_xy(x, y + 7)
+                pdf.cell(col_widths[i], 5, line2, 0, 0, 'C')
+            if line3:
+                pdf.set_xy(x, y + 12)
+                pdf.cell(col_widths[i], 5, line3, 0, 0, 'C')
             pdf.set_xy(x + col_widths[i], start_y)
+
         pdf.set_xy(pdf.l_margin, start_y + header_height)
         pdf.set_text_color(0, 0, 0)
         for row_idx in range(len(df)):
@@ -117,7 +120,6 @@ def generate_pdf(df, report_date, title="Leads Report"):
     output = pdf.output(dest='S')
     return bytes(output) if isinstance(output, (bytes, bytearray)) else output.encode('latin-1')
 
-# ── PARSE DATE ────────────────────────────────────────────────────────────────
 def parse_to_ist(series):
     results = []
     ist_tz = pytz.timezone('Asia/Kolkata')
@@ -156,10 +158,8 @@ def parse_to_ist(series):
         results.append(parsed)
     return pd.Series(results, index=series.index)
 
-# ── LOAD SHEETS ───────────────────────────────────────────────────────────────
 def load_all_sheets(sheet_names_list, auto_fetch_all):
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    import json
     creds_dict = dict(st.secrets["gcp_service_account"])
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     client = gspread.authorize(creds)
@@ -178,7 +178,7 @@ def load_all_sheets(sheet_names_list, auto_fetch_all):
         try:
             spreadsheet = client.open(spreadsheet_name)
             worksheets = spreadsheet.worksheets()
-        except Exception as e:
+        except:
             continue
         for ws in worksheets:
             try:
@@ -215,59 +215,37 @@ def load_all_sheets(sheet_names_list, auto_fetch_all):
         return None
     return pd.concat(all_dfs, ignore_index=True)
 
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# ── SIDEBAR — SPREADSHEET MANAGER ─────────────────────────────────════════════
-# ═══════════════════════════════════════════════════════════════════════════════
 with st.sidebar:
     st.header("⚙️ Spreadsheet Settings")
-
     saved_names, saved_auto = load_sheet_names()
-
-    auto_fetch = st.toggle(
-        "🔄 Auto-fetch all sheets",
-        value=saved_auto,
-        help="Service account સાથે share થયેલી બધી sheets automatically fetch થશે"
-    )
-
+    auto_fetch = st.toggle("🔄 Auto-fetch all sheets", value=saved_auto,
+        help="Service account સાથે share થયેલી બધી sheets automatically fetch થશે")
     st.divider()
     st.subheader("📋 Manual Sheet Names")
     st.caption("This list will be used when auto-fetch is OFF.")
-
     if "sheet_names" not in st.session_state:
         st.session_state.sheet_names = saved_names if saved_names else [""]
-
     to_delete = None
     for i, name in enumerate(st.session_state.sheet_names):
         col_a, col_b = st.columns([5, 1])
         with col_a:
-            new_val = st.text_input(
-                f"Sheet {i+1}",
-                value=name,
-                key=f"sheet_input_{i}",
-                label_visibility="collapsed",
-                placeholder="Spreadsheet name..."
-            )
+            new_val = st.text_input(f"Sheet {i+1}", value=name, key=f"sheet_input_{i}",
+                label_visibility="collapsed", placeholder="Spreadsheet name...")
             st.session_state.sheet_names[i] = new_val
         with col_b:
             if st.button("🗑️", key=f"del_{i}", help="Delete"):
                 to_delete = i
-
     if to_delete is not None:
         st.session_state.sheet_names.pop(to_delete)
         st.rerun()
-
     if st.button("➕ Add Sheet", use_container_width=True):
         st.session_state.sheet_names.append("")
         st.rerun()
-
     st.divider()
-
     if st.button("💾 Save Settings", use_container_width=True, type="primary"):
         clean_names = [n.strip() for n in st.session_state.sheet_names if n.strip()]
         save_sheet_names(clean_names, auto_fetch)
         st.success(f"✅ Saved! {len(clean_names)} sheets")
-
     current_names, current_auto = load_sheet_names()
     if current_names:
         st.divider()
@@ -275,10 +253,6 @@ with st.sidebar:
         for n in current_names:
             st.caption(f"• {n}")
 
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# ── MAIN UI ───────────────────────────────────────────────────────────────────
-# ═══════════════════════════════════════════════════════════════════════════════
 ist = pytz.timezone('Asia/Kolkata')
 now_ist = datetime.now(ist)
 yesterday_default = (now_ist - timedelta(1)).date()
@@ -296,35 +270,15 @@ else:
     if sheet_names_list:
         st.info(f"📋 **Manual mode** — {len(sheet_names_list)} sheets configured: {', '.join(sheet_names_list)}")
     else:
-        st.warning("⚠️ Manual mode is ON, but no sheet names are saved! Please add them to the sidebar.")
+        st.warning("⚠️ Manual mode is ON, but no sheet names are saved!")
 
-# ── CENTERED TABLE STYLE ──────────────────────────────────────────────────────
 st.markdown("""
     <style>
-        .leads-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 10px;
-            font-size: 14px;
-        }
-        .leads-table th {
-            background-color: #34495e;
-            color: white;
-            text-align: center !important;
-            padding: 10px 8px;
-            border: 1px solid #2c3e50;
-        }
-        .leads-table td {
-            text-align: center !important;
-            padding: 8px;
-            border: 1px solid #ddd;
-        }
-        .leads-table tr:nth-child(even) td {
-            background-color: #f5f5f5;
-        }
-        .leads-table tr:hover td {
-            background-color: #eaf4fb;
-        }
+        .leads-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
+        .leads-table th { background-color: #34495e; color: white; text-align: center !important; padding: 10px 8px; border: 1px solid #2c3e50; }
+        .leads-table td { text-align: center !important; padding: 8px; border: 1px solid #ddd; }
+        .leads-table tr:nth-child(even) td { background-color: #f5f5f5; }
+        .leads-table tr:hover td { background-color: #eaf4fb; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -334,7 +288,6 @@ def render_centered_table(df):
 
 if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
     sheet_names_list, auto_fetch_active = load_sheet_names()
-
     if not auto_fetch_active and not sheet_names_list:
         st.error("❌ Sidebar માં sheet names add કરીને Save કરો!")
         st.stop()
@@ -348,11 +301,9 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
 
             target_date = selected_date
             date_label = target_date.strftime('%d-%m-%Y')
-
             filtered = df[df['created_dt'].dt.date == target_date].copy()
             if filtered.empty:
                 filtered = df[df['created_time'] == date_label].copy()
-
             if filtered.empty:
                 st.warning(f"No leads for {date_label}.")
                 last = df['created_dt'].dropna().dt.date.value_counts().sort_index(ascending=False).head(3)
@@ -375,7 +326,6 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
                         project_dfs[project_name] = pdf_df
 
             all_display = pd.concat(list(project_dfs.values()), ignore_index=True) if project_dfs else pd.DataFrame()
-
             st.success(f"✅ {len(all_display)} leads found for {date_label}")
             if 'Project' in all_display.columns:
                 breakdown = all_display['Project'].value_counts().reset_index()
@@ -383,8 +333,6 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
                 st.table(breakdown)
 
             st.subheader(f"📋 Preview — {date_label}")
-
-            # ── CENTERED TABLE (replaces st.dataframe) ──
             render_centered_table(all_display)
 
             save_dir = None
@@ -402,7 +350,13 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
             for idx, project_name in enumerate(project_dfs.keys()):
                 sdf = project_dfs[project_name]
                 try:
-                    pdf_bytes = generate_pdf(sdf.drop(columns=['Project'], errors='ignore'), date_label, f"{project_name} - {date_label}")
+                    # ── Campaign name as PDF title ──
+                    campaign = sdf['campaign_name'].iloc[0] if 'campaign_name' in sdf.columns and sdf['campaign_name'].iloc[0] else project_name
+                    pdf_bytes = generate_pdf(
+                        sdf.drop(columns=['Project'], errors='ignore'),
+                        date_label,
+                        f"{campaign} - {date_label}"
+                    )
                     if pdf_bytes and len(pdf_bytes) > 100:
                         safe_name = project_name.replace(' ', '-')
                         fname = f"{safe_name}-({date_label}){len(sdf)}leads.pdf"
