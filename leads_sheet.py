@@ -318,34 +318,56 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
             all_display = pd.concat(list(project_dfs.values()), ignore_index=True) if project_dfs else pd.DataFrame()
             st.success(f"✅ {len(all_display)} leads found for {date_label}")
 
-            st.divider()
+           st.divider()
+            # લાઈન 322: સ્પેલિંગ સુધારો (save_dir)
+            save_dir = None 
+            try:
+                month_folder = target_date.strftime('%B_%Y')
+                save_dir = os.path.join(save_folder, month_folder, date_label)
+                os.makedirs(save_dir, exist_ok=True)
+            except Exception as ex:
+                st.warning(f"Folder create nathi thayu: {ex}")
+
             st.subheader("📥 Download PDFs")
             saved_files = []
-
+            
+            # લાઈન 325: ડેટા કલેક્શન ચેક કરો
             for idx, project_name in enumerate(project_dfs.keys()):
                 sdf = project_dfs[project_name]
+                
+                # ખાતરી કરો કે sdf એક DataFrame જ છે (TypeError ફિક્સ)
+                if not isinstance(sdf, pd.DataFrame):
+                    continue
+                    
                 try:
+                    # PDF જનરેટ કરો
                     pdf_bytes = generate_pdf(
                         sdf.drop(columns=['Project'], errors='ignore'),
                         date_label,
                         project_name
                     )
+                    
                     if pdf_bytes and len(pdf_bytes) > 100:
                         safe_name = project_name.replace(' ', '-')
-                        fname = f"{safe_name}-({date_label}){len(sdf)}leads.pdf"
+                        fname = f"{safe_name}-({date_label})_{len(sdf)}leads.pdf"
+                        
+                        # લાઈન 336: અહીં 'save_dir' વેરિએબલ સાચો હોવો જોઈએ
                         if save_dir:
-                            with open(os.path.join(save_dir, fname), 'wb') as f:
+                            file_path = os.path.join(save_dir, fname)
+                            with open(file_path, 'wb') as f:
                                 f.write(pdf_bytes)
                             saved_files.append(fname)
+                        
+                        # ડાઉનલોડ બટન
                         st.download_button(
                             label=f"📥 {project_name} ({len(sdf)} leads)",
                             data=pdf_bytes,
                             file_name=fname,
                             mime="application/pdf",
-                            key=f"pdf_{idx}"
+                            key=f"pdf_btn_{idx}"
                         )
                 except Exception as ex:
-                    st.warning(f"PDF error for {project_name}: {ex}")
+                    st.error(f"PDF error for {project_name}: {ex}")
 
             if saved_files and save_dir:
                 st.success(f"💾 {len(saved_files)} PDFs saved in folder!")
