@@ -8,8 +8,11 @@ import requests
 import os
 import json
 import pytz
+import io
+import zipfile
 from dateutil import parser as dtparser
 from dotenv import load_dotenv
+
 
 load_dotenv()
 
@@ -88,7 +91,7 @@ def generate_pdf(df, report_date, title="Leads Report"):
             pdf.set_fill_color(52, 73, 94)
             pdf.rect(x, y, col_widths[i], header_height, 'FD')
             pdf.set_text_color(255, 255, 255)
-            pdf.set_font(font_name, size=current_font_size) 
+            pdf.set_font(font_name, size=8)
             pdf.set_xy(x, y + 3) 
             pdf.multi_cell(col_widths[i], 4, str(col), 0, 'C')
             pdf.set_xy(x + col_widths[i], start_y)
@@ -313,62 +316,56 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
             all_display = pd.concat(list(project_dfs.values()), ignore_index=True) if project_dfs else pd.DataFrame()
             st.success(f"✅ {len(all_display)} leads found for {date_label}")
 
-           # લાઇન ૩૨૧ થી રિપ્લેસ કરો
+          # --- અહીંથી રિપ્લેસ કરો (લાઇન ૩૨૧ થી છેલ્લે સુધી) ---
             st.divider()
-            save_dir = None 
+            zip_buffer = io.BytesIO()
+            
             try:
                 month_folder = target_date.strftime('%B_%Y')
                 save_dir = os.path.join(save_folder, month_folder, date_label)
                 os.makedirs(save_dir, exist_ok=True)
-            except Exception as ex:
-                st.warning(f"Folder create nathi thayu: {ex}")
-
-            st.subheader("📥 Download PDFs")
-            saved_files = []
-            
-            for idx, project_name in enumerate(project_dfs.keys()):
-                sdf = project_dfs[project_name]
                 
-                # TypeError અટકાવવા માટે ચેક
-                if not isinstance(sdf, pd.DataFrame):
-                    continue
-                    
-                try:
-                    # PDF જનરેટ કરો (font_size એરર સોલ્વ કરવા માટે generate_pdf માં ફેરફાર જરૂરી છે)
-                    pdf_bytes = generate_pdf(
-                        sdf.drop(columns=['Project'], errors='ignore'),
-                        date_label,
-                        project_name
-                    )
-                    
-                    if pdf_bytes and len(pdf_bytes) > 100:
+                # ZIP ફાઇલ બનાવવાનું લોજિક
+                with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
+                    for project_name, sdf in project_dfs.items():
+                        # PDF જનરેટ કરો
+                        pdf_bytes = generate_pdf(
+                            sdf.drop(columns=['Project'], errors='ignore'),
+                            date_label,
+                            project_name
+                        )
+                        
                         safe_name = project_name.replace(' ', '-')
                         fname = f"{safe_name}-({date_label})_{len(sdf)}leads.pdf"
                         
-                        if save_dir:
-                            file_path = os.path.join(save_dir, fname)
-                            with open(file_path, 'wb') as f:
-                                f.write(pdf_bytes)
-                            saved_files.append(fname)
+                        # ૧. લોકલ ડ્રાઈવમાં સેવ કરો
+                        file_path = os.path.join(save_dir, fname)
+                        with open(file_path, 'wb') as f:
+                            f.write(pdf_bytes)
                         
-                        st.download_button(
-                            label=f"📥 {project_name} ({len(sdf)} leads)",
-                            data=pdf_bytes,
-                            file_name=fname,
-                            mime="application/pdf",
-                            key=f"pdf_btn_{idx}"
-                        )
-                except Exception as ex:
-                    # image_041056.png મુજબની એરર અહીં દેખાશે
-                    st.error(f"PDF error for {project_name}: {ex}")
+                        # ૨. ZIP માં ઉમેરો
+                        zip_file.writestr(fname, pdf_bytes)
 
-            if saved_files and save_dir:
-                st.success(f"💾 {len(saved_files)} PDFs saved in folder!")
-                st.code(save_dir, language=None)
+                st.success(f"✅ {len(project_dfs)} Reports generated and saved in D:\\Enacle")
+                st.info(f"📁 Path: {save_dir}")
+                
+                # માત્ર એક જ ZIP ડાઉનલોડ બટન
+                st.download_button(
+                    label="📥 Download All PDFs as ZIP",
+                    data=zip_buffer.getvalue(),
+                    file_name=f"Leads_Reports_{date_label}.zip",
+                    mime="application/zip",
+                    use_container_width=True
+                )
+                
+                # ફોલ્ડર ઓપન કરવાનો પ્રયત્ન
                 try:
                     os.startfile(save_dir)
                 except:
                     pass
+
+            except Exception as ex:
+                st.error(f"Error during saving: {ex}")
 
         except Exception as e:
             st.error(f"Error: {e}")
