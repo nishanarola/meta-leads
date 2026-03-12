@@ -159,7 +159,9 @@ def parse_to_ist(series):
 # ── LOAD SHEETS ───────────────────────────────────────────────────────────────
 def load_all_sheets(sheet_names_list, auto_fetch_all):
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    creds = ServiceAccountCredentials.from_json_keyfile_name("service_account.json", scope)
+    import json
+    creds_dict = dict(st.secrets["gcp_service_account"])
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     client = gspread.authorize(creds)
 
     if auto_fetch_all:
