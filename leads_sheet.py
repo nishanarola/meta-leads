@@ -79,30 +79,21 @@ def generate_pdf(df, report_date, title="Leads Report"):
         col_widths = [w * page_width / sum(col_widths) for w in col_widths]
         header_height = 15
         start_y = pdf.get_y()
+        current_font_size = 8
 
         for i, col in enumerate(df.columns):
             x = pdf.get_x()
             y = start_y
+            
             pdf.set_fill_color(52, 73, 94)
             pdf.rect(x, y, col_widths[i], header_height, 'FD')
             pdf.set_text_color(255, 255, 255)
-            
-            # ફિક્સ ફોન્ટ સાઈઝ (ખૂબ નાની ન થાય તે માટે)
-            pdf.set_font(font_name, size=8) 
-            
-            # multi_cell વાપરવાથી લાંબુ હેડર આપોઆપ નીચેની લાઈનમાં આવશે
-            pdf.set_xy(x, y + 2)
+            pdf.set_font(font_name, size=current_font_size) 
+            pdf.set_xy(x, y + 3) 
             pdf.multi_cell(col_widths[i], 4, str(col), 0, 'C')
-            
-            # ફરીથી પોઝિશન સેટ કરો આગલી કોલમ માટે
             pdf.set_xy(x + col_widths[i], start_y)
 
-            pdf.set_xy(pdf.l_margin, start_y + header_height)
-            pdf.set_xy(x, y + (header_height - font_size) / 2)
-            pdf.cell(col_widths[i], font_size, text, 0, 0, 'C')
-            pdf.set_font(font_name, size=9)
-            pdf.set_xy(x + col_widths[i], start_y)
-
+        pdf.set_xy(pdf.l_margin, start_y + header_height)
         pdf.set_xy(pdf.l_margin, start_y + header_height)
         pdf.set_text_color(0, 0, 0)
         for row_idx in range(len(df)):
