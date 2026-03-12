@@ -345,9 +345,6 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
                                 f.write(pdf_bytes)
                             
                             zip_file.writestr(fname, pdf_bytes)
-
-                st.success(f"✅ {len(project_dfs)} Reports generated and saved in D:\\Enacle")
-                st.info(f"📁 Path: {final_save_dir}")
                 
                 st.download_button(
                     label="📥 Download All Reports as ZIP",
