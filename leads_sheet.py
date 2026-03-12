@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 st.set_page_config(page_title="Enacle", page_icon="🏠", layout="wide")
-st.title("🏠 Enacle — Yesterday's Leads Report")
+st.title("🏠 Enacle — Leads Report")
 
 SHEETS_CONFIG_FILE = "sheets_config.json"
 
@@ -209,10 +209,8 @@ def load_all_sheets(sheet_names_list, auto_fetch_all):
     return pd.concat(all_dfs, ignore_index=True)
 
 with st.sidebar:
-    st.header("⚙️ Spreadsheet Settings")
+    st.header("⚙️ Settings")
     saved_names, saved_auto = load_sheet_names()
-    auto_fetch = st.toggle("🔄 Auto-fetch all sheets", value=saved_auto,
-        help="Service account સાથે share થયેલી બધી sheets automatically fetch થશે")
     st.divider()
     st.subheader("📋 Manual Sheet Names")
     st.caption("This list will be used when auto-fetch is OFF.")
@@ -277,7 +275,7 @@ def render_centered_table(df):
 if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
     sheet_names_list, auto_fetch_active = load_sheet_names()
     if not auto_fetch_active and not sheet_names_list:
-        st.error("❌ Sidebar માં sheet names add કરીને Save કરો!")
+        st.error("❌ Add the sheet names to the sidebar and save it!")
         st.stop()
 
     with st.spinner("Fetching data from Google Sheets..."):
