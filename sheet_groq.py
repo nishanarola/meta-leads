@@ -232,7 +232,7 @@ with st.sidebar:
 
     st.divider()
     st.subheader("📋 Manual Sheet Names")
-    st.caption("Auto-fetch OFF હોય ત્યારે આ list વપરાશે")
+    st.caption("This list will be used when auto-fetch is OFF.")
 
     if "sheet_names" not in st.session_state:
         st.session_state.sheet_names = saved_names if saved_names else [""]
