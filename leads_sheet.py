@@ -270,9 +270,10 @@ else:
 
 st.markdown("""
     <style>
-        .leads-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
-        .leads-table th { background-color: #34495e; color: white; text-align: center !important; padding: 10px 8px; border: 1px solid #2c3e50; }
-        .leads-table td { text-align: center !important; padding: 8px; border: 1px solid #ddd; }
+        .leads-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; table-layout: auto; }
+        .leads-table th { background-color: #34495e; color: white; text-align: center !important; padding: 10px 8px; border: 1px solid #2c3e50; white-space: normal !important;  word-wrap: break-word; max-width: 150px; 
+        vertical-align: middle}
+        .leads-table td { text-align: center !important; padding: 8px; border: 1px solid #ddd; white-space: normal !important;}
         .leads-table tr:nth-child(even) td { background-color: #f5f5f5; }
         .leads-table tr:hover td { background-color: #eaf4fb; }
     </style>
