@@ -291,12 +291,12 @@ with col2:
 
 sheet_names_list, auto_fetch_active = load_sheet_names()
 if auto_fetch_active:
-    st.info("🔄 **Auto-fetch mode ON** — Service account સાથે share થયેલી બધી sheets fetch થશે")
+    st.info("🔄 **Auto-fetch mode ON** — All sheets shared with the service account will be fetched.")
 else:
     if sheet_names_list:
         st.info(f"📋 **Manual mode** — {len(sheet_names_list)} sheets configured: {', '.join(sheet_names_list)}")
     else:
-        st.warning("⚠️ Manual mode ON છે પણ કોઈ sheet name save નથી! Sidebar માં add કરો.")
+        st.warning("⚠️ Manual mode is ON, but no sheet names are saved! Please add them to the sidebar.")
 
 # ── CENTERED TABLE STYLE ──────────────────────────────────────────────────────
 st.markdown("""
