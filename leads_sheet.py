@@ -317,21 +317,6 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
 
             all_display = pd.concat(list(project_dfs.values()), ignore_index=True) if project_dfs else pd.DataFrame()
             st.success(f"✅ {len(all_display)} leads found for {date_label}")
-            if 'Project' in all_display.columns:
-                breakdown = all_display['Project'].value_counts().reset_index()
-                breakdown.columns = ['Project', 'Leads']
-                st.table(breakdown)
-
-            st.subheader(f"📋 Preview — {date_label}")
-            render_centered_table(all_display)
-
-            save_dir = None
-            try:
-                month_folder = target_date.strftime('%B_%Y')
-                save_dir = os.path.join(save_folder, month_folder, date_label)
-                os.makedirs(save_dir, exist_ok=True)
-            except Exception as ex:
-                st.warning(f"Folder banavi nai shkayu: {ex}")
 
             st.divider()
             st.subheader("📥 Download PDFs")
