@@ -22,5 +22,5 @@ python setup_secrets.py
 
 :: Start app
 cd /d "%~dp0"
-python -m streamlit run sheet_groq.py
+python -m streamlit run leads_sheet.py
 pause
