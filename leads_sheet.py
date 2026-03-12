@@ -183,7 +183,7 @@ def load_all_sheets(sheet_names_list, auto_fetch_all):
                 df['Project'] = ws.title
                 df['_spreadsheet'] = spreadsheet_name
                 if 'campaign_name' in df.columns:
-                    df['campaign_name'] = df['campaign_name'].astype(str).str.split('|').str[0].str.strip()
+                    df['campaign_name'] = ws.title.astype(str).str.split('|').str[0].str.strip()
                 for col in df.columns:
                     if 'phone' in col.lower() or 'mobile' in col.lower():
                         df[col] = df[col].astype(str).str.replace(r'^p:', '', regex=True).str.strip()
