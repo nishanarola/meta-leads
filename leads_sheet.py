@@ -253,13 +253,7 @@ with col2:
     save_folder = st.text_input("💾 Save Folder Path", value=r"D:\Enacle")
 
 sheet_names_list, auto_fetch_active = load_sheet_names()
-if auto_fetch_active:
-    st.info("🔄 **Auto-fetch mode ON** — All sheets shared with the service account will be fetched.")
-else:
-    if sheet_names_list:
-        st.info(f"📋 **Manual mode** — {len(sheet_names_list)} sheets configured: {', '.join(sheet_names_list)}")
-    else:
-        st.warning("⚠️ Manual mode is ON, but no sheet names are saved!")
+
 
 st.markdown("""
     <style>
