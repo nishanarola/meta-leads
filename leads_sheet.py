@@ -147,7 +147,7 @@ def parse_to_ist(series):
         results.append(parsed)
     return pd.Series(results, index=series.index)
 
-def load_all_sheets(sheet_names_list, auto_fetch_all=False):
+def load_all_sheets(sheet_names_list, auto_fetch_all):
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     creds_dict = dict(st.secrets["gcp_service_account"])
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
@@ -157,6 +157,7 @@ def load_all_sheets(sheet_names_list, auto_fetch_all=False):
         try:
             all_spreadsheets = [s.title for s in client.list_spreadsheet_files()]
         except Exception as e:
+            st.warning(f"Auto-fetch failed, using manual list: {e}")
             all_spreadsheets = sheet_names_list
     else:
         all_spreadsheets = sheet_names_list
@@ -182,7 +183,7 @@ def load_all_sheets(sheet_names_list, auto_fetch_all=False):
                 df['Project'] = ws.title
                 df['_spreadsheet'] = spreadsheet_name
                 if 'campaign_name' in df.columns:
-                    df['campaign_name'] = ws.title.astype(str).str.split('|').str[0].str.strip()
+                    df['campaign_name'] = df['campaign_name'].astype(str).str.split('|').str[0].str.strip()
                 for col in df.columns:
                     if 'phone' in col.lower() or 'mobile' in col.lower():
                         df[col] = df[col].astype(str).str.replace(r'^p:', '', regex=True).str.strip()
@@ -206,6 +207,8 @@ def load_all_sheets(sheet_names_list, auto_fetch_all=False):
 with st.sidebar:
     st.header("⚙️ Spreadsheet Settings")
     saved_names, saved_auto = load_sheet_names()
+    auto_fetch = st.toggle("🔄 Auto-fetch all sheets", value=saved_auto,
+        help="Service account સાથે share થયેલી બધી sheets automatically fetch થશે")
     st.divider()
     st.subheader("📋 Manual Sheet Names")
     st.caption("This list will be used when auto-fetch is OFF.")
