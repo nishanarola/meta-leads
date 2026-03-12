@@ -316,56 +316,54 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
             all_display = pd.concat(list(project_dfs.values()), ignore_index=True) if project_dfs else pd.DataFrame()
             st.success(f"✅ {len(all_display)} leads found for {date_label}")
 
-          # --- અહીંથી રિપ્લેસ કરો (લાઇન ૩૨૧ થી છેલ્લે સુધી) ---
+ 
             st.divider()
+            
+       
             zip_buffer = io.BytesIO()
+            final_save_dir = None
             
             try:
                 month_folder = target_date.strftime('%B_%Y')
-                save_dir = os.path.join(save_folder, month_folder, date_label)
-                os.makedirs(save_dir, exist_ok=True)
+                final_save_dir = os.path.join(save_folder, month_folder, date_label)
+                os.makedirs(final_save_dir, exist_ok=True)
                 
-                # ZIP ફાઇલ બનાવવાનું લોજિક
                 with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
                     for project_name, sdf in project_dfs.items():
-                        # PDF જનરેટ કરો
                         pdf_bytes = generate_pdf(
                             sdf.drop(columns=['Project'], errors='ignore'),
                             date_label,
                             project_name
                         )
                         
-                        safe_name = project_name.replace(' ', '-')
-                        fname = f"{safe_name}-({date_label})_{len(sdf)}leads.pdf"
-                        
-                        # ૧. લોકલ ડ્રાઈવમાં સેવ કરો
-                        file_path = os.path.join(save_dir, fname)
-                        with open(file_path, 'wb') as f:
-                            f.write(pdf_bytes)
-                        
-                        # ૨. ZIP માં ઉમેરો
-                        zip_file.writestr(fname, pdf_bytes)
+                        if pdf_bytes:
+                            safe_name = project_name.replace(' ', '-')
+                            fname = f"{safe_name}-({date_label})_{len(sdf)}leads.pdf"
+                            
+                            file_path = os.path.join(final_save_dir, fname)
+                            with open(file_path, 'wb') as f:
+                                f.write(pdf_bytes)
+                            
+                            zip_file.writestr(fname, pdf_bytes)
 
                 st.success(f"✅ {len(project_dfs)} Reports generated and saved in D:\\Enacle")
-                st.info(f"📁 Path: {save_dir}")
+                st.info(f"📁 Path: {final_save_dir}")
                 
-                # માત્ર એક જ ZIP ડાઉનલોડ બટન
                 st.download_button(
-                    label="📥 Download All PDFs as ZIP",
+                    label="📥 Download All Reports as ZIP",
                     data=zip_buffer.getvalue(),
-                    file_name=f"Leads_Reports_{date_label}.zip",
+                    file_name=f"Enacle_Leads_{date_label}.zip",
                     mime="application/zip",
                     use_container_width=True
                 )
                 
-                # ફોલ્ડર ઓપન કરવાનો પ્રયત્ન
                 try:
-                    os.startfile(save_dir)
+                    os.startfile(final_save_dir)
                 except:
                     pass
 
             except Exception as ex:
-                st.error(f"Error during saving: {ex}")
+                st.error(f"Error during saving process: {ex}")
 
         except Exception as e:
             st.error(f"Error: {e}")
