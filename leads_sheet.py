@@ -77,32 +77,28 @@ def generate_pdf(df, report_date, title="Leads Report"):
             elif not col.isascii(): col_widths.append(40)
             else: col_widths.append(25)
         col_widths = [w * page_width / sum(col_widths) for w in col_widths]
-        pdf.set_font(font_name, size=9)
         header_height = 22
         start_y = pdf.get_y()
 
-        def split_3lines(text, limit=14):
-            text = str(text)
-            if len(text) <= limit:
-                return text, "", ""
-            third = len(text) // 3
-            return text[:third].strip(), text[third:third*2].strip(), text[third*2:].strip()
-
         for i, col in enumerate(df.columns):
-            line1, line2, line3 = split_3lines(col)
             x = pdf.get_x()
             y = start_y
             pdf.set_fill_color(52, 73, 94)
             pdf.rect(x, y, col_widths[i], header_height, 'FD')
             pdf.set_text_color(255, 255, 255)
-            pdf.set_xy(x, y + 2)
-            pdf.cell(col_widths[i], 5, line1, 0, 0, 'C')
-            if line2:
-                pdf.set_xy(x, y + 7)
-                pdf.cell(col_widths[i], 5, line2, 0, 0, 'C')
-            if line3:
-                pdf.set_xy(x, y + 12)
-                pdf.cell(col_widths[i], 5, line3, 0, 0, 'C')
+
+            # Auto font size fit
+            text = str(col)
+            font_size = 9
+            while font_size > 4:
+                pdf.set_font(font_name, size=font_size)
+                if pdf.get_string_width(text) <= col_widths[i] - 2:
+                    break
+                font_size -= 0.5
+
+            pdf.set_xy(x, y + (header_height - font_size) / 2)
+            pdf.cell(col_widths[i], font_size, text, 0, 0, 'C')
+            pdf.set_font(font_name, size=9)
             pdf.set_xy(x + col_widths[i], start_y)
 
         pdf.set_xy(pdf.l_margin, start_y + header_height)
@@ -350,12 +346,10 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
             for idx, project_name in enumerate(project_dfs.keys()):
                 sdf = project_dfs[project_name]
                 try:
-                    # ── Campaign name as PDF title ──
-                    campaign = sdf['campaign_name'].iloc[0] if 'campaign_name' in sdf.columns and sdf['campaign_name'].iloc[0] else project_name
                     pdf_bytes = generate_pdf(
                         sdf.drop(columns=['Project'], errors='ignore'),
                         date_label,
-                        f"{campaign} - {date_label}"
+                        project_name
                     )
                     if pdf_bytes and len(pdf_bytes) > 100:
                         safe_name = project_name.replace(' ', '-')
