@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 st.set_page_config(page_title="Enacle", page_icon="🏠", layout="wide")
-st.title("🏠 Enacle — Leads Report")
+st.title("Enacle — Leads Report")
 
 SHEETS_CONFIG_FILE = "sheets_config.json"
 
