@@ -209,8 +209,7 @@ def load_all_sheets(sheet_names_list, auto_fetch_all):
 with st.sidebar:
     st.header("⚙️ Settings")
     saved_names, saved_auto = load_sheet_names()
-    auto_fetch = st.toggle("🔄 Auto-fetch all sheets", value=saved_auto,
-        help="Service account સાથે share થયેલી બધી sheets automatically fetch થશે")
+    auto_fetch = True
     st.divider()
     st.subheader("📋 Manual Sheet Names")
     st.caption("This list will be used when auto-fetch is OFF.")
