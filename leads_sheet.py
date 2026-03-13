@@ -155,7 +155,8 @@ def load_all_sheets(sheet_names_list, auto_fetch_all):
 
     if auto_fetch_all:
         try:
-            all_spreadsheets = [s.title for s in client.list_spreadsheet_files()]
+            files = client.list_spreadsheet_files()
+            all_spreadsheets = [s['title'] if isinstance(s, dict) else s.title for s in files]
         except Exception as e:
             st.warning(f"Auto-fetch failed, using manual list: {e}")
             all_spreadsheets = sheet_names_list
