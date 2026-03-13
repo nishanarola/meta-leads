@@ -221,7 +221,7 @@ def load_all_sheets(sheet_names_list, auto_fetch_all):
                     df = df.rename(columns={'phone_number': 'phone'})
                 cols_to_drop = ['id', 'ad_id', 'ad_name', 'adset_id', 'adset_name',
                                 'campaign_id', 'form_id', 'form_name', 'is_organic',
-                                'platform', 'lead_status']
+                                'platform', 'lead_status', 'adset']
                 df = df.drop(columns=[c for c in cols_to_drop if c in df.columns])
                 all_dfs.append(df)
             except:
