@@ -82,21 +82,18 @@ def generate_pdf(df, report_date, title="Leads Report"):
         col_widths = [w * page_width / sum(col_widths) for w in col_widths]
         header_height = 15
         start_y = pdf.get_y()
-        current_font_size = 8
 
         for i, col in enumerate(df.columns):
             x = pdf.get_x()
             y = start_y
-            
             pdf.set_fill_color(52, 73, 94)
             pdf.rect(x, y, col_widths[i], header_height, 'FD')
             pdf.set_text_color(255, 255, 255)
             pdf.set_font(font_name, size=8)
-            pdf.set_xy(x, y + 3) 
+            pdf.set_xy(x, y + 3)
             pdf.multi_cell(col_widths[i], 4, str(col), 0, 'C')
             pdf.set_xy(x + col_widths[i], start_y)
 
-        pdf.set_xy(pdf.l_margin, start_y + header_height)
         pdf.set_xy(pdf.l_margin, start_y + header_height)
         pdf.set_text_color(0, 0, 0)
         for row_idx in range(len(df)):
@@ -258,12 +255,10 @@ with col2:
 
 sheet_names_list, auto_fetch_active = load_sheet_names()
 
-
 st.markdown("""
     <style>
         .leads-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; table-layout: auto; }
-        .leads-table th { background-color: #34495e; color: white; text-align: center !important; padding: 10px 8px; border: 1px solid #2c3e50; white-space: normal !important;  word-wrap: break-word; max-width: 150px; 
-        vertical-align: middle}
+        .leads-table th { background-color: #34495e; color: white; text-align: center !important; padding: 10px 8px; border: 1px solid #2c3e50; white-space: normal !important; word-wrap: break-word; max-width: 150px; vertical-align: middle}
         .leads-table td { text-align: center !important; padding: 8px; border: 1px solid #ddd; white-space: normal !important;}
         .leads-table tr:nth-child(even) td { background-color: #f5f5f5; }
         .leads-table tr:hover td { background-color: #eaf4fb; }
@@ -293,9 +288,7 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
             if filtered.empty:
                 filtered = df[df['created_time'] == date_label].copy()
             if filtered.empty:
-                st.warning(f"No leads for {date_label}.")
-                last = df['created_dt'].dropna().dt.date.value_counts().sort_index(ascending=False).head(3)
-                st.info(f"Last dates: {dict(last)}")
+                st.error(f"❌ No Leads Found for {date_label}.")
                 st.stop()
 
             found_spreadsheets = filtered['_spreadsheet'].unique().tolist()
@@ -316,18 +309,16 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
             all_display = pd.concat(list(project_dfs.values()), ignore_index=True) if project_dfs else pd.DataFrame()
             st.success(f"✅ {len(all_display)} leads found for {date_label}")
 
- 
             st.divider()
-            
-       
+
             zip_buffer = io.BytesIO()
             final_save_dir = None
-            
+
             try:
                 month_folder = target_date.strftime('%B_%Y')
                 final_save_dir = os.path.join(save_folder, month_folder, date_label)
                 os.makedirs(final_save_dir, exist_ok=True)
-                
+
                 with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
                     for project_name, sdf in project_dfs.items():
                         pdf_bytes = generate_pdf(
@@ -335,17 +326,14 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
                             date_label,
                             project_name
                         )
-                        
                         if pdf_bytes:
                             safe_name = project_name.replace(' ', '-')
                             fname = f"{safe_name}-({date_label})_{len(sdf)}leads.pdf"
-                            
                             file_path = os.path.join(final_save_dir, fname)
                             with open(file_path, 'wb') as f:
                                 f.write(pdf_bytes)
-                            
                             zip_file.writestr(fname, pdf_bytes)
-                
+
                 st.download_button(
                     label="📥 Download All Reports as ZIP",
                     data=zip_buffer.getvalue(),
@@ -353,7 +341,7 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
                     mime="application/zip",
                     use_container_width=True
                 )
-                
+
                 try:
                     os.startfile(final_save_dir)
                 except:
