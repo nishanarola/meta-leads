@@ -276,7 +276,7 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
         st.error("❌ Add the sheet names to the sidebar and save it!")
         st.stop()
 
-    with st.spinner("Fetching data from Google Sheets..."):
+    with st.spinner(""):
         try:
             df = load_all_sheets(sheet_names_list, auto_fetch_active)
             if df is None:
