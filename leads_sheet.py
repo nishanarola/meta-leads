@@ -83,6 +83,7 @@ def generate_pdf(df, report_date, title="Leads Report"):
         header_height = 15
         start_y = pdf.get_y()
 
+        # Header
         for i, col in enumerate(df.columns):
             x = pdf.get_x()
             y = start_y
@@ -97,35 +98,37 @@ def generate_pdf(df, report_date, title="Leads Report"):
         pdf.set_xy(pdf.l_margin, start_y + header_height)
         pdf.set_text_color(0, 0, 0)
 
+        # Rows
+        line_height = 5.5
         for row_idx in range(len(df)):
             if pdf.get_y() + 20 > pdf.page_break_trigger:
                 pdf.add_page()
-                pdf.set_font(font_name, size=9)
+                pdf.set_font(font_name, size=8)
 
             pdf.set_fill_color(245, 245, 245) if row_idx % 2 == 0 else pdf.set_fill_color(255, 255, 255)
             pdf.set_font(font_name, size=8)
-
             row_y = pdf.get_y()
-            max_height = 11
 
-            # First pass: calculate max row height
+            # Calculate max height for this row
+            max_lines = 1
             for i, col in enumerate(df.columns):
                 val = str(df.iloc[row_idx][col])
-                x = pdf.l_margin + sum(col_widths[:i])
-                # Simulate multi_cell to get height
-                nb_lines = max(1, len(val) // max(1, int(col_widths[i] / 2.2)) + 1)
-                cell_h = nb_lines * 5.5
-                if cell_h > max_height:
-                    max_height = cell_h
+                chars_per_line = max(1, int(col_widths[i] / 2.2))
+                lines = max(1, -(-len(val) // chars_per_line))
+                if lines > max_lines:
+                    max_lines = lines
+            row_height = max_lines * line_height
 
-            # Second pass: draw cells with uniform height
+            # Draw each cell
             for i, col in enumerate(df.columns):
                 val = str(df.iloc[row_idx][col])
                 x = pdf.l_margin + sum(col_widths[:i])
                 pdf.set_xy(x, row_y)
-                pdf.multi_cell(col_widths[i], 5.5, val, 1, 'C', fill=True)
+                pdf.rect(x, row_y, col_widths[i], row_height, 'FD')
+                pdf.set_xy(x, row_y + (row_height - line_height) / 2)
+                pdf.cell(col_widths[i], line_height, val, 0, 0, 'C')
 
-            pdf.set_xy(pdf.l_margin, row_y + max_height)
+            pdf.set_xy(pdf.l_margin, row_y + row_height)
 
     output = pdf.output(dest='S')
     return bytes(output) if isinstance(output, (bytes, bytearray)) else output.encode('latin-1')
