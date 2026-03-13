@@ -282,9 +282,10 @@ sheet_names_list, auto_fetch_active = load_sheet_names()
 
 st.markdown("""
     <style>
-            section[data-testid="stSidebar"] .stButton > button {
-            background-color: hsl(217, 91%, 60%) !important;
-            border-color: hsl(217, 91%, 60%) !important;
+           section[data-testid="stSidebar"] .stButton > button {
+    background-color: hsl(217, 91%, 60%) !important;
+    border-color: hsl(217, 91%, 60%) !important;
+    color: white !important;}
         .leads-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; table-layout: auto; }
         .leads-table th { background-color: #34495e; color: white; text-align: center !important; padding: 10px 8px; border: 1px solid #2c3e50; white-space: normal !important; word-wrap: break-word; max-width: 150px; vertical-align: middle}
         .leads-table td { text-align: center !important; padding: 8px; border: 1px solid #ddd; white-space: normal !important;}
