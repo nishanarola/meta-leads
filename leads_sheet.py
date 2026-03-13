@@ -64,7 +64,7 @@ def generate_pdf(df, report_date, title="Leads Report"):
         pdf.add_font("MainFont", "", FONT_PATH, uni=True)
     page_width = 277
     pdf.set_font(font_name, size=18)
-    pdf.cell(0, 8, title, ln=True, align='C')
+    pdf.cell(0, 8, str(title), ln=True, align='C')
     pdf.set_font(font_name, size=14)
     pdf.cell(0, 6, f"Date: {report_date}  |  Total Leads: {len(df)}", ln=True, align='C')
     pdf.ln(4)
@@ -96,16 +96,37 @@ def generate_pdf(df, report_date, title="Leads Report"):
 
         pdf.set_xy(pdf.l_margin, start_y + header_height)
         pdf.set_text_color(0, 0, 0)
+
         for row_idx in range(len(df)):
-            if pdf.get_y() + 12 > pdf.page_break_trigger:
+            if pdf.get_y() + 20 > pdf.page_break_trigger:
                 pdf.add_page()
                 pdf.set_font(font_name, size=9)
+
             pdf.set_fill_color(245, 245, 245) if row_idx % 2 == 0 else pdf.set_fill_color(255, 255, 255)
+            pdf.set_font(font_name, size=8)
+
+            row_y = pdf.get_y()
+            max_height = 11
+
+            # First pass: calculate max row height
             for i, col in enumerate(df.columns):
                 val = str(df.iloc[row_idx][col])
-                max_chars = max(8, int(col_widths[i] / 2.0))
-                pdf.cell(col_widths[i], 11, val[:max_chars] + ('..' if len(val) > max_chars else ''), 1, 0, 'C', fill=True)
-            pdf.ln()
+                x = pdf.l_margin + sum(col_widths[:i])
+                # Simulate multi_cell to get height
+                nb_lines = max(1, len(val) // max(1, int(col_widths[i] / 2.2)) + 1)
+                cell_h = nb_lines * 5.5
+                if cell_h > max_height:
+                    max_height = cell_h
+
+            # Second pass: draw cells with uniform height
+            for i, col in enumerate(df.columns):
+                val = str(df.iloc[row_idx][col])
+                x = pdf.l_margin + sum(col_widths[:i])
+                pdf.set_xy(x, row_y)
+                pdf.multi_cell(col_widths[i], 5.5, val, 1, 'C', fill=True)
+
+            pdf.set_xy(pdf.l_margin, row_y + max_height)
+
     output = pdf.output(dest='S')
     return bytes(output) if isinstance(output, (bytes, bytearray)) else output.encode('latin-1')
 
@@ -181,10 +202,7 @@ def load_all_sheets(sheet_names_list, auto_fetch_all):
                 df['created_dt'] = parse_to_ist(df['created_time'])
                 df['created_time'] = df['created_dt'].dt.strftime('%d-%m-%Y')
                 df['Project'] = ws.title
-                df['campaign_name'] = ws.title
                 df['_spreadsheet'] = spreadsheet_name
-                if 'campaign_name' in df.columns:
-                    df['campaign_name'] = df['campaign_name'].astype(str).str.split('|').str[0].str.strip()
                 for col in df.columns:
                     if 'phone' in col.lower() or 'mobile' in col.lower():
                         df[col] = df[col].astype(str).str.replace(r'^p:', '', regex=True).str.strip()
@@ -196,7 +214,7 @@ def load_all_sheets(sheet_names_list, auto_fetch_all):
                     df = df.rename(columns={'phone_number': 'phone'})
                 cols_to_drop = ['id', 'ad_id', 'ad_name', 'adset_id', 'adset_name',
                                 'campaign_id', 'form_id', 'form_name', 'is_organic',
-                                'platform', 'lead_status']
+                                'platform', 'lead_status', 'campaign_name']
                 df = df.drop(columns=[c for c in cols_to_drop if c in df.columns])
                 all_dfs.append(df)
             except:
@@ -307,6 +325,7 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
 
             all_display = pd.concat(list(project_dfs.values()), ignore_index=True) if project_dfs else pd.DataFrame()
             st.success(f"✅ {len(all_display)} leads found for {date_label}")
+
             zip_buffer = io.BytesIO()
             final_save_dir = None
 
@@ -317,11 +336,15 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
 
                 with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
                     for project_name, sdf in project_dfs.items():
-                        pdf_bytes = generate_pdf(
-                            sdf.drop(columns=['Project'], errors='ignore'),
-                            date_label,
-                            project_name
-                        )
+                        try:
+                            pdf_bytes = generate_pdf(
+                                sdf.drop(columns=['Project'], errors='ignore'),
+                                date_label,
+                                project_name
+                            )
+                        except Exception as pdf_err:
+                            st.warning(f"PDF error {project_name}: {pdf_err}")
+                            continue
                         if pdf_bytes and len(pdf_bytes) > 100:
                             safe_name = project_name.replace(' ', '-')
                             fname = f"{safe_name}-({date_label})_{len(sdf)}leads.pdf"
