@@ -134,9 +134,7 @@ def generate_pdf(df, report_date, title="Leads Report"):
             pdf.set_xy(pdf.l_margin, row_y + row_height)
 
     output = pdf.output(dest='S')
-    if isinstance(output, (bytes, bytearray)):
-        return bytes(output)
-    return bytes(output, 'latin-1') if isinstance(output, str) else bytes(output)
+    return bytes(output) if isinstance(output, (bytes, bytearray)) else output.encode('latin-1')
 
 def parse_to_ist(series):
     results = []
@@ -357,8 +355,7 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
                                 project_name
                             )
                         except Exception as pdf_err:
-                            st.error(f"PDF error {project_name}: {pdf_err}")
-                            st.exception(pdf_err)
+                            st.warning(f"PDF error {project_name}: {pdf_err}")
                             continue
                         if pdf_bytes and len(pdf_bytes) > 100:
                             safe_name = project_name.replace(' ', '-')
