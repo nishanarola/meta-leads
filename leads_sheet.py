@@ -231,7 +231,7 @@ def load_all_sheets(sheet_names_list, auto_fetch_all):
     return pd.concat(all_dfs, ignore_index=True)
 
 with st.sidebar:
-    st.image("enacle-logo.png", use_container_width=True)
+    st.image("enacle-logo.png", width=150)
     st.header("⚙️ Settings")
     saved_names, saved_auto = load_sheet_names()
     auto_fetch = True
