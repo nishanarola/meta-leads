@@ -282,7 +282,7 @@ sheet_names_list, auto_fetch_active = load_sheet_names()
 
 st.markdown("""
     <style>
-           .stElementContainer element-container st-emotion-cache-3pwa5w e12zf7d51 {
+          .st-emotion-cache-3pwa5w {
     display: none;}
            section[data-testid="stSidebar"] .stButton > button {
     background-color: hsl(217, 91%, 60%) !important;
