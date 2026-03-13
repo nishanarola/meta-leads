@@ -134,7 +134,9 @@ def generate_pdf(df, report_date, title="Leads Report"):
             pdf.set_xy(pdf.l_margin, row_y + row_height)
 
     output = pdf.output(dest='S')
-    return bytes(output) if isinstance(output, (bytes, bytearray)) else output.encode('latin-1')
+    if isinstance(output, (bytes, bytearray)):
+        return bytes(output)
+    return bytes(output, 'latin-1') if isinstance(output, str) else bytes(output)
 
 def parse_to_ist(series):
     results = []
