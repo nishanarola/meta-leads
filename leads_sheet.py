@@ -355,7 +355,8 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
                                 project_name
                             )
                         except Exception as pdf_err:
-                            st.warning(f"PDF error {project_name}: {pdf_err}")
+                            st.error(f"PDF error {project_name}: {pdf_err}")
+                            st.exception(pdf_err)
                             continue
                         if pdf_bytes and len(pdf_bytes) > 100:
                             safe_name = project_name.replace(' ', '-')
