@@ -307,9 +307,6 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
 
             all_display = pd.concat(list(project_dfs.values()), ignore_index=True) if project_dfs else pd.DataFrame()
             st.success(f"✅ {len(all_display)} leads found for {date_label}")
-
-            st.divider()
-
             zip_buffer = io.BytesIO()
             final_save_dir = None
 
@@ -325,7 +322,7 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
                             date_label,
                             project_name
                         )
-                        if pdf_bytes:
+                        if pdf_bytes and len(pdf_bytes) > 100:
                             safe_name = project_name.replace(' ', '-')
                             fname = f"{safe_name}-({date_label})_{len(sdf)}leads.pdf"
                             file_path = os.path.join(final_save_dir, fname)
