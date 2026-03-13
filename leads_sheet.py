@@ -206,6 +206,8 @@ def load_all_sheets(sheet_names_list, auto_fetch_all):
                 df['created_time'] = df['created_dt'].dt.strftime('%d-%m-%Y')
                 df['Project'] = ws.title
                 df['_spreadsheet'] = spreadsheet_name
+                if 'campaign_name' in df.columns:
+                    df['campaign_name'] = df['campaign_name'].astype(str).str.split('|').str[0].str.strip()
                 for col in df.columns:
                     if 'phone' in col.lower() or 'mobile' in col.lower():
                         df[col] = df[col].astype(str).str.replace(r'^p:', '', regex=True).str.strip()
@@ -217,7 +219,7 @@ def load_all_sheets(sheet_names_list, auto_fetch_all):
                     df = df.rename(columns={'phone_number': 'phone'})
                 cols_to_drop = ['id', 'ad_id', 'ad_name', 'adset_id', 'adset_name',
                                 'campaign_id', 'form_id', 'form_name', 'is_organic',
-                                'platform', 'lead_status', 'campaign_name']
+                                'platform', 'lead_status']
                 df = df.drop(columns=[c for c in cols_to_drop if c in df.columns])
                 all_dfs.append(df)
             except:
