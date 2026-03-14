@@ -239,12 +239,12 @@ with st.sidebar:
     st.image("enacle-logo.png", width=150)
     st.header("⚙️ Settings")
     saved_names, saved_auto = load_sheet_names()
-    auto_fetch = True
+    auto_fetch = saved_auto
     st.divider()
     st.subheader("📋 Manual Sheet Names")
     st.caption("This list will be used when auto-fetch is OFF.")
     if "sheet_names" not in st.session_state:
-        st.session_state.sheet_names = saved_names if saved_names else [""]
+        st.session_state.sheet_names = saved_names if saved_names else ["Gopinathji Grp", "Gopinathji Grp Leads 2"]
     to_delete = None
     for i, name in enumerate(st.session_state.sheet_names):
         col_a, col_b = st.columns([5, 1])
