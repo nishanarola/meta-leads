@@ -365,6 +365,12 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
                             non_empty_cols = [col for col in pdf_df.columns 
                                             if pdf_df[col].replace('', pd.NA).notna().any()]
                             pdf_df = pdf_df[non_empty_cols]
+
+                            priority_cols = ['full_name', 'phone']
+                            other_cols = [col for col in pdf_df.columns if col not in priority_cols]
+                            existing_priority = [col for col in priority_cols if col in pdf_df.columns]
+                            pdf_df = pdf_df[other_cols + existing_priority]
+
                             pdf_bytes = generate_pdf(pdf_df, date_label, project_name)
                         except Exception as pdf_err:
                             st.warning(f"PDF error {project_name}: {pdf_err}")
