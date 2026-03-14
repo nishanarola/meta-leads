@@ -12,6 +12,7 @@ import io
 import zipfile
 from dateutil import parser as dtparser
 from dotenv import load_dotenv
+import re
 
 
 load_dotenv()
@@ -380,8 +381,7 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
                             st.warning(f"PDF error {project_name}: {pdf_err}")
                             continue
                         if pdf_bytes and len(pdf_bytes) > 100:
-                            import re
-                        safe_name = re.sub(r'[\\/:*?"<>|]', '', project_name).replace(' ', '-').strip('-')
+                            safe_name = re.sub(r'[\\/:*?"<>|]', '', project_name).replace(' ', '-').strip('-')
                             fname = f"{safe_name}-({date_label})_{len(sdf)}leads.pdf"
                             file_path = os.path.join(final_save_dir, fname)
                             with open(file_path, 'wb') as f:
