@@ -361,11 +361,11 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
                 with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
                     for project_name, sdf in project_dfs.items():
                         try:
-                            pdf_bytes = generate_pdf(
-                                sdf.drop(columns=['Project'], errors='ignore'),
-                                date_label,
-                                project_name
-                            )
+                            pdf_df = sdf.drop(columns=['Project'], errors='ignore').copy()
+                            non_empty_cols = [col for col in pdf_df.columns 
+                                            if pdf_df[col].replace('', pd.NA).notna().any()]
+                            pdf_df = pdf_df[non_empty_cols]
+                            pdf_bytes = generate_pdf(pdf_df, date_label, project_name)
                         except Exception as pdf_err:
                             st.warning(f"PDF error {project_name}: {pdf_err}")
                             continue
