@@ -111,7 +111,8 @@ def generate_pdf(df, report_date, title="Leads Report"):
 
             max_lines = 1
             for i, col in enumerate(df.columns):
-                val = str(df.iloc[row_idx][col]).replace('\u2019', "'").replace('\u2018', "'").replace('\u02bc', "'")
+                val = str(df.iloc[row_idx][col])
+                val = ''.join(c if ord(c) < 128 or '\u0A80' <= c <= '\u0AFF' else '?' for c in val)
                 chars_per_line = max(1, int(col_widths[i] / 2.2))
                 lines = max(1, -(-len(val) // chars_per_line))
                 if lines > max_lines:
@@ -119,7 +120,8 @@ def generate_pdf(df, report_date, title="Leads Report"):
             row_height = max_lines * line_height
 
             for i, col in enumerate(df.columns):
-                val = str(df.iloc[row_idx][col]).replace('\u2019', "'").replace('\u2018', "'").replace('\u02bc', "'")
+                val = str(df.iloc[row_idx][col])
+                val = ''.join(c if ord(c) < 128 or '\u0A80' <= c <= '\u0AFF' else '?' for c in val)
                 x = pdf.l_margin + sum(col_widths[:i])
                 chars_per_line = max(1, int(col_widths[i] / 2.2))
                 num_lines = max(1, -(-len(val) // chars_per_line))
