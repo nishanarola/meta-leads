@@ -109,7 +109,6 @@ def generate_pdf(df, report_date, title="Leads Report"):
             pdf.set_font(font_name, size=8)
             row_y = pdf.get_y()
 
-            # Calculate max height for this row
             max_lines = 1
             for i, col in enumerate(df.columns):
                 val = str(df.iloc[row_idx][col])
@@ -119,7 +118,6 @@ def generate_pdf(df, report_date, title="Leads Report"):
                     max_lines = lines
             row_height = max_lines * line_height
 
-            # Draw each cell with multiline support
             for i, col in enumerate(df.columns):
                 val = str(df.iloc[row_idx][col])
                 x = pdf.l_margin + sum(col_widths[:i])
@@ -198,10 +196,17 @@ def load_all_sheets(sheet_names_list, auto_fetch_all):
             continue
         for ws in worksheets:
             try:
-                data = ws.get_all_records(head=1)
-                if not data:
+                # ✅ get_all_values() વાપરો — blank rows આવશે નહીં
+                data = ws.get_all_values()
+                if not data or len(data) < 2:
                     continue
-                df = pd.DataFrame(data)
+                headers = data[0]
+                rows = data[1:]
+                # ✅ ફક્ત એ rows રાખો જેમાં ઓછામાં ઓછું 1 cell માં value હોય
+                rows = [r for r in rows if any(str(cell).strip() for cell in r)]
+                if not rows:
+                    continue
+                df = pd.DataFrame(rows, columns=headers)
                 df = df.replace('', pd.NA)
                 if 'created_time' not in df.columns:
                     continue
@@ -339,6 +344,11 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
 
             all_display = pd.concat(list(project_dfs.values()), ignore_index=True) if project_dfs else pd.DataFrame()
             st.success(f"✅ {len(all_display)} leads found for {date_label}")
+
+            # ✅ દરેક project અલગ table તરીકે show કરો
+            for project_name, pdf_df in project_dfs.items():
+                st.subheader(f"📁 {project_name} — {len(pdf_df)} leads")
+                render_centered_table(pdf_df)
 
             zip_buffer = io.BytesIO()
             final_save_dir = None
