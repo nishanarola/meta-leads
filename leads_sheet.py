@@ -12,7 +12,6 @@ import io
 import zipfile
 from dateutil import parser as dtparser
 from dotenv import load_dotenv
-import re
 
 
 load_dotenv()
@@ -197,11 +196,13 @@ def load_all_sheets(sheet_names_list, auto_fetch_all):
             continue
         for ws in worksheets:
             try:
+                # ✅ get_all_values() વાપરો — blank rows આવશે નહીં
                 data = ws.get_all_values()
                 if not data or len(data) < 2:
                     continue
                 headers = data[0]
                 rows = data[1:]
+                # ✅ ફક્ત એ rows રાખો જેમાં ઓછામાં ઓછું 1 cell માં value હોય
                 rows = [r for r in rows if any(str(cell).strip() for cell in r)]
                 if not rows:
                     continue
@@ -211,18 +212,9 @@ def load_all_sheets(sheet_names_list, auto_fetch_all):
                     continue
                 df['created_dt'] = parse_to_ist(df['created_time'])
                 df['created_time'] = df['created_dt'].dt.strftime('%d-%m-%Y')
-
-                # ✅ FIX: campaign_name column ma thi Project set karo (worksheet title nahi)
-                # Sheet ma drek row no campaign_name = te row no actual project name
-                if 'campaign_name' in df.columns:
-                    # campaign_name blank hoy to worksheet title fallback
-                    df['Project'] = df['campaign_name'].replace('', pd.NA).fillna(ws.title)
-                else:
-                    df['Project'] = ws.title
-                    df['campaign_name'] = ws.title
-
+                df['Project'] = ws.title
                 df['_spreadsheet'] = spreadsheet_name
-
+                df['campaign_name'] = ws.title
                 for col in df.columns:
                     if 'phone' in col.lower() or 'mobile' in col.lower():
                         df[col] = df[col].astype(str).str.replace(r'^p:', '', regex=True).str.strip()
@@ -340,7 +332,6 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
             for sname in found_spreadsheets:
                 sdf = filtered[filtered['_spreadsheet'] == sname].copy()
                 for project_name in sdf['Project'].unique():
-                    # ✅ FIX: sirf te project ni j rows levo
                     pdf_df = sdf[sdf['Project'] == project_name].copy()
                     pdf_df = pdf_df.drop(columns=['created_dt', '_spreadsheet'], errors='ignore').reset_index(drop=True)
                     for col in pdf_df.columns:
@@ -354,7 +345,7 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
             all_display = pd.concat(list(project_dfs.values()), ignore_index=True) if project_dfs else pd.DataFrame()
             st.success(f"✅ {len(all_display)} leads found for {date_label}")
 
-            # દરેક project અલગ table તરીકે show કરો
+            # ✅ દરેક project અલગ table તરીકે show કરો
             for project_name, pdf_df in project_dfs.items():
                 st.subheader(f"📁 {project_name} — {len(pdf_df)} leads")
                 render_centered_table(pdf_df)
@@ -370,10 +361,8 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
                 with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
                     for project_name, sdf in project_dfs.items():
                         try:
-                            # ✅ FIX: sdf already sirf te project ni rows chhe
-                            # Project column drop kari ne PDF banavo (title ma already project name chhe)
                             pdf_bytes = generate_pdf(
-                                sdf.drop(columns=['Project', 'campaign_name'], errors='ignore'),
+                                sdf.drop(columns=['Project'], errors='ignore'),
                                 date_label,
                                 project_name
                             )
@@ -381,7 +370,7 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
                             st.warning(f"PDF error {project_name}: {pdf_err}")
                             continue
                         if pdf_bytes and len(pdf_bytes) > 100:
-                            safe_name = re.sub(r'[\\/:*?"<>|]', '', project_name).replace(' ', '-').strip('-')
+                            safe_name = project_name.replace(' ', '-')
                             fname = f"{safe_name}-({date_label})_{len(sdf)}leads.pdf"
                             file_path = os.path.join(final_save_dir, fname)
                             with open(file_path, 'wb') as f:
