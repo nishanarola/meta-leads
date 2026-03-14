@@ -228,14 +228,7 @@ def load_all_sheets(sheet_names_list, auto_fetch_all):
                                 'campaign_id', 'form_id', 'form_name', 'is_organic',
                                 'platform', 'lead_status', 'adset']
                 df = df.drop(columns=[c for c in cols_to_drop if c in df.columns])
-                for col in df.columns:
-                    if df[col].dtype == object:
-                        df[col] = df[col].astype(str).str.replace("'", '"', regex=False)
-                        df[col] = df[col].str.replace("_", " ", regex=False)
-                    if df[col].dtype == object:
-                        df[col] = df[col].astype(str).str.replace("'", '"', regex=False)
-                        df[col] = df[col].str.replace("_", " ", regex=False)
-                all_dfs.append(df)  # ← આ for loop ની બહાર
+                all_dfs.append(df)  
             except:
                 continue
     if not all_dfs:
