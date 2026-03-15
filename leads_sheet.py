@@ -70,11 +70,12 @@ def generate_pdf(df, report_date, title="Leads Report"):
         except:
             pass
     
-    if os.path.exists(DEJAVU_PATH):
-        pdf.add_font("MainFont", "", DEJAVU_PATH, uni=True)
-        font_name = "MainFont"
-    elif FONT_AVAILABLE:
+    # DejaVu ને બદલે સીધું Noto Sans Gujarati વાપરો
+    if FONT_AVAILABLE:
         pdf.add_font("MainFont", "", FONT_PATH, uni=True)
+        font_name = "MainFont"
+    elif os.path.exists(DEJAVU_PATH):
+        pdf.add_font("MainFont", "", DEJAVU_PATH, uni=True)
         font_name = "MainFont"
     else:
         font_name = "Arial"
@@ -148,9 +149,7 @@ def generate_pdf(df, report_date, title="Leads Report"):
 
             pdf.set_xy(pdf.l_margin, row_y + row_height)
 
-    output = pdf.output(dest='S')
-    return bytes(output) if isinstance(output, (bytes, bytearray)) else output.encode('latin-1', errors='replace')
-
+    return pdf.output()
 
 def parse_to_ist(series):
     results = []
