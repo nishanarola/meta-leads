@@ -35,18 +35,17 @@ def save_sheet_names(names, auto_fetch):
     with open(SHEETS_CONFIG_FILE, "w") as f:
         json.dump({"sheets": names, "auto_fetch": auto_fetch}, f, indent=2)
 
-FONT_PATH = "NotoSansGujarati-Regular.ttf"
+FONT_PATH = "NotoSansGujarati.ttf"
 
 def download_font():
     if os.path.exists(FONT_PATH) and os.path.getsize(FONT_PATH) > 10000:
         return True
     try:
         for url in [
-            "https://github.com/google/fonts/raw/main/ofl/notosansgujarati/NotoSansGujarati-Regular.ttf",
-            "https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSansGujarati/NotoSansGujarati-Regular.ttf",
-            "https://raw.githubusercontent.com/google/fonts/main/ofl/notosansgujarati/NotoSansGujarati-Regular.ttf",
+            "https://github.com/google/fonts/raw/main/ofl/notosansgujarati/NotoSansGujarati%5Bwdth%2Cwght%5D.ttf",
+            "https://fonts.gstatic.com/s/notosansgujarati/v20/6xKhdSpbNNCT-vSSdB8ArxGi3dSQ.ttf",
         ]:
-            r = requests.get(url, timeout=15)
+            r = requests.get(url, timeout=10)
             if r.status_code == 200 and len(r.content) > 10000:
                 with open(FONT_PATH, "wb") as f:
                     f.write(r.content)
@@ -61,18 +60,30 @@ def generate_pdf(df, report_date, title="Leads Report"):
     pdf = FPDF(orientation='L', unit='mm', format='A4')
     pdf.add_page()
     
+    DEJAVU_PATH = "DejaVuSans.ttf"
+    if not os.path.exists(DEJAVU_PATH):
+        try:
+            r = requests.get(
+                "https://github.com/dejavu-fonts/dejavu-fonts/releases/download/version_2_37/dejavu-fonts-ttf-2.37.tar.bz2",
+                timeout=15
+            )
+        except:
+            pass
+    
+    # DejaVu ને બદલે સીધું Noto Sans Gujarati વાપરો
     if FONT_AVAILABLE:
-        # fpdf2 માં 'uni=True' ની જરૂર નથી, તે ઓટોમેટિક હોય છે
+        pdf.add_font("MainFont", "", FONT_PATH, uni=True)
+        font_name = "MainFont"
+    elif os.path.exists(DEJAVU_PATH):
         pdf.add_font("MainFont", "", FONT_PATH)
         font_name = "MainFont"
     else:
         font_name = "Arial"
-        font_name = "Arial"
+
     page_width = 277
     pdf.set_font(font_name, size=18)
     pdf.cell(0, 8, str(title), ln=True, align='C')
     pdf.set_font(font_name, size=14)
-    pdf.cell(0, 6, f"Date: {report_date}  |  Total Leads: {len(df)}", ln=True, align='C')
     pdf.ln(4)
     if not df.empty:
         col_widths = []
@@ -118,6 +129,7 @@ def generate_pdf(df, report_date, title="Leads Report"):
             max_lines = 1
             for i, col in enumerate(df.columns):
                 val = str(df.iloc[row_idx][col])
+                val = ''.join(c if ord(c) < 128 or '\u0A80' <= c <= '\u0AFF' else '?' for c in val)
                 chars_per_line = max(1, int(col_widths[i] / 2.2))
                 lines = max(1, -(-len(val) // chars_per_line))
                 if lines > max_lines:
