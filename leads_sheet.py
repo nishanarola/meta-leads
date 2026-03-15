@@ -125,14 +125,14 @@ def generate_pdf(df, report_date, title="Leads Report"):
 
             for i, col in enumerate(df.columns):
                 val = str(df.iloc[row_idx][col])
-                val = val.replace('_', ' ').strip()
-                if val in ('nan', 'None', 'NaT', 'none', ''):
-                    val = ''
-                try:
-                    pdf.cell(col_widths[i], line_height, val, border=1, align='C', fill=True)
-                except Exception:
-                    safe = val.encode('latin-1', errors='replace').decode('latin-1')
-                    pdf.cell(col_widths[i], line_height, safe, border=1, align='C', fill=True)
+                x = pdf.l_margin + sum(col_widths[:i])
+                chars_per_line = max(1, int(col_widths[i] / 2.2))
+                num_lines = max(1, -(-len(val) // chars_per_line))
+                cell_line_h = row_height / num_lines
+                pdf.set_xy(x, row_y)
+                pdf.rect(x, row_y, col_widths[i], row_height, 'FD')
+                pdf.set_xy(x, row_y)
+                pdf.multi_cell(col_widths[i], cell_line_h, val, 0, 'C')
 
             pdf.set_xy(pdf.l_margin, row_y + row_height)
 
