@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-from fpdf import FPDF
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
@@ -19,7 +18,7 @@ import io
 import zipfile
 from dateutil import parser as dtparser
 from dotenv import load_dotenv
-
+import re
 
 load_dotenv()
 
@@ -49,10 +48,10 @@ def download_font():
         return True
     try:
         for url in [
-            "https://github.com/google/fonts/raw/main/ofl/notosansgujarati/NotoSansGujarati%5Bwdth%2Cwght%5D.ttf",
-            "https://fonts.gstatic.com/s/notosansgujarati/v20/6xKhdSpbNNCT-vSSdB8ArxGi3dSQ.ttf",
+            "https://github.com/google/fonts/raw/main/ofl/notosansgujarati/NotoSansGujarati-Regular.ttf",
+            "https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSansGujarati/NotoSansGujarati-Regular.ttf",
         ]:
-            r = requests.get(url, timeout=10)
+            r = requests.get(url, timeout=15)
             if r.status_code == 200 and len(r.content) > 10000:
                 with open(FONT_PATH, "wb") as f:
                     f.write(r.content)
@@ -63,100 +62,146 @@ def download_font():
 
 FONT_AVAILABLE = download_font()
 
-def generate_pdf(df, report_date, title="Leads Report"):
-    pdf = FPDF(orientation='L', unit='mm', format='A4')
-    pdf.add_page()
-    
-    DEJAVU_PATH = "DejaVuSans.ttf"
-    if not os.path.exists(DEJAVU_PATH):
-        try:
-            r = requests.get(
-                "https://github.com/dejavu-fonts/dejavu-fonts/releases/download/version_2_37/dejavu-fonts-ttf-2.37.tar.bz2",
-                timeout=15
-            )
-        except:
-            pass
-    
-    # DejaVu ને બદલે સીધું Noto Sans Gujarati વાપરો
-    if FONT_AVAILABLE:
-        pdf.add_font("MainFont", "", FONT_PATH, uni=True)
-        font_name = "MainFont"
-    elif os.path.exists(DEJAVU_PATH):
-        pdf.add_font("MainFont", "", FONT_PATH)
-        font_name = "MainFont"
-    else:
-        font_name = "Arial"
+def clean_html(text):
+    """HTML tags remove કરો, plain text રાખો"""
+    text = str(text)
+    text = re.sub(r'<[^>]+>', '', text)   # HTML tags remove
+    text = text.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>').replace('&nbsp;', ' ')
+    text = text.strip()
+    if text in ('nan', 'None', 'NaT', 'none', 'NaN'):
+        return ''
+    return text
 
-    page_width = 277
-    pdf.set_font(font_name, size=18)
-    pdf.cell(0, 8, str(title), ln=True, align='C')
-    pdf.set_font(font_name, size=14)
-    pdf.ln(4)
+def clean_col_name(col):
+    """Column name clean કરો — underscore ને space માં"""
+    col = str(col)
+    col = col.replace('_', ' ').strip()
+    return col
+
+def generate_pdf(df, report_date, title="Leads Report"):
+    buffer = io.BytesIO()
+
+    # Font setup
+    font_name = "Helvetica"
+    if FONT_AVAILABLE and os.path.exists(FONT_PATH):
+        try:
+            pdfmetrics.registerFont(TTFont("GujaratiFont", FONT_PATH))
+            font_name = "GujaratiFont"
+        except:
+            font_name = "Helvetica"
+
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(A4),
+        rightMargin=8*mm,
+        leftMargin=8*mm,
+        topMargin=10*mm,
+        bottomMargin=10*mm
+    )
+
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        fontName=font_name,
+        fontSize=16,
+        alignment=1,
+        spaceAfter=3,
+        textColor=colors.HexColor('#1a1a2e')
+    )
+    subtitle_style = ParagraphStyle(
+        'Subtitle',
+        fontName=font_name,
+        fontSize=11,
+        alignment=1,
+        spaceAfter=8,
+        textColor=colors.HexColor('#555555')
+    )
+    header_style = ParagraphStyle(
+        'Header',
+        fontName=font_name,
+        fontSize=7,
+        alignment=1,
+        leading=9,
+        textColor=colors.white
+    )
+    cell_style = ParagraphStyle(
+        'Cell',
+        fontName=font_name,
+        fontSize=7,
+        alignment=1,
+        leading=9,
+        textColor=colors.HexColor('#222222')
+    )
+
+    elements = []
+    elements.append(Paragraph(clean_html(title), title_style))
+    elements.append(Paragraph(f"Date: {report_date}  |  Total Leads: {len(df)}", subtitle_style))
+    elements.append(Spacer(1, 3*mm))
+
     if not df.empty:
-        col_widths = []
+        # Clean column names
+        clean_cols = [clean_col_name(c) for c in df.columns]
+
+        # Header row
+        header_row = [Paragraph(c, header_style) for c in clean_cols]
+
+        # Data rows — HTML clean કરો
+        data_rows = []
+        for _, row in df.iterrows():
+            data_rows.append([
+                Paragraph(clean_html(v), cell_style) for v in row
+            ])
+
+        table_data = [header_row] + data_rows
+
+        # Column widths
+        page_w = landscape(A4)[0] - 16*mm
+        col_count = len(df.columns)
+
+        # Smart widths based on column type
+        raw_widths = []
         for col in df.columns:
             c = col.lower()
-            if any(x in c for x in ['date', 'time']): col_widths.append(22)
-            elif any(x in c for x in ['phone', 'mobile']): col_widths.append(30)
-            elif 'campaign' in c: col_widths.append(32)
-            elif 'project' in c: col_widths.append(28)
-            elif 'name' in c: col_widths.append(32)
-            elif not col.isascii(): col_widths.append(40)
-            else: col_widths.append(25)
-        col_widths = [w * page_width / sum(col_widths) for w in col_widths]
-        header_height = 15
-        start_y = pdf.get_y()
+            if any(x in c for x in ['date', 'time']):
+                raw_widths.append(20)
+            elif any(x in c for x in ['phone', 'mobile']):
+                raw_widths.append(28)
+            elif 'name' in c:
+                raw_widths.append(30)
+            elif not col.isascii():
+                raw_widths.append(38)
+            else:
+                raw_widths.append(24)
 
-        # Header
-        for i, col in enumerate(df.columns):
-            x = pdf.get_x()
-            y = start_y
-            pdf.set_fill_color(52, 73, 94)
-            pdf.rect(x, y, col_widths[i], header_height, 'FD')
-            pdf.set_text_color(255, 255, 255)
-            pdf.set_font(font_name, size=8)
-            pdf.set_xy(x, y + 3)
-            pdf.multi_cell(col_widths[i], 4, str(col), 0, 'C')
-            pdf.set_xy(x + col_widths[i], start_y)
+        total = sum(raw_widths)
+        col_widths = [w * page_w / total for w in raw_widths]
 
-        pdf.set_xy(pdf.l_margin, start_y + header_height)
-        pdf.set_text_color(0, 0, 0)
+        table = Table(table_data, colWidths=col_widths, repeatRows=1)
+        table.setStyle(TableStyle([
+            # Header
+            ('BACKGROUND',    (0, 0), (-1, 0),  colors.HexColor('#34495e')),
+            ('TEXTCOLOR',     (0, 0), (-1, 0),  colors.white),
+            # All cells
+            ('ALIGN',         (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
+            ('FONTNAME',      (0, 0), (-1, -1), font_name),
+            ('FONTSIZE',      (0, 0), (-1, 0),  8),
+            ('FONTSIZE',      (0, 1), (-1, -1), 7),
+            ('TOPPADDING',    (0, 0), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            ('LEFTPADDING',   (0, 0), (-1, -1), 3),
+            ('RIGHTPADDING',  (0, 0), (-1, -1), 3),
+            # Alternating rows
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f5f5f5'), colors.white]),
+            # Grid
+            ('GRID',          (0, 0), (-1, -1), 0.4, colors.HexColor('#cccccc')),
+            ('LINEBELOW',     (0, 0), (-1, 0),  1,   colors.HexColor('#2c3e50')),
+        ]))
 
-        # Rows
-        line_height = 5.5
-        for row_idx in range(len(df)):
-            if pdf.get_y() + 20 > pdf.page_break_trigger:
-                pdf.add_page()
-                pdf.set_font(font_name, size=8)
+        elements.append(table)
 
-            pdf.set_fill_color(245, 245, 245) if row_idx % 2 == 0 else pdf.set_fill_color(255, 255, 255)
-            pdf.set_font(font_name, size=8)
-            row_y = pdf.get_y()
+    doc.build(elements)
+    return buffer.getvalue()
 
-            max_lines = 1
-            for i, col in enumerate(df.columns):
-                val = str(df.iloc[row_idx][col])
-                val = ''.join(c if ord(c) < 128 or '\u0A80' <= c <= '\u0AFF' else '?' for c in val)
-                chars_per_line = max(1, int(col_widths[i] / 2.2))
-                lines = max(1, -(-len(val) // chars_per_line))
-                if lines > max_lines:
-                    max_lines = lines
-            row_height = max_lines * line_height
-
-            for i, col in enumerate(df.columns):
-                val = str(df.iloc[row_idx][col])
-                x = pdf.l_margin + sum(col_widths[:i])
-                chars_per_line = max(1, int(col_widths[i] / 2.2))
-                num_lines = max(1, -(-len(val) // chars_per_line))
-                cell_line_h = row_height / num_lines
-                pdf.set_xy(x, row_y)
-                pdf.rect(x, row_y, col_widths[i], row_height, 'FD')
-                pdf.set_xy(x, row_y)
-                pdf.multi_cell(col_widths[i], cell_line_h, val, 0, 'C')
-
-            pdf.set_xy(pdf.l_margin, row_y + row_height)
-
-    return pdf.output()
 
 def parse_to_ist(series):
     results = []
@@ -220,13 +265,11 @@ def load_all_sheets(sheet_names_list, auto_fetch_all):
             continue
         for ws in worksheets:
             try:
-                # ✅ get_all_values() વાપરો — blank rows આવશે નહીં
                 data = ws.get_all_values()
                 if not data or len(data) < 2:
                     continue
                 headers = data[0]
                 rows = data[1:]
-                # ✅ ફક્ત એ rows રાખો જેમાં ઓછામાં ઓછું 1 cell માં value હોય
                 rows = [r for r in rows if any(str(cell).strip() for cell in r)]
                 if not rows:
                     continue
@@ -252,7 +295,7 @@ def load_all_sheets(sheet_names_list, auto_fetch_all):
                                 'campaign_id', 'form_id', 'form_name', 'is_organic',
                                 'platform', 'lead_status', 'adset']
                 df = df.drop(columns=[c for c in cols_to_drop if c in df.columns])
-                all_dfs.append(df)  
+                all_dfs.append(df)
             except:
                 continue
     if not all_dfs:
@@ -311,16 +354,15 @@ sheet_names_list, auto_fetch_active = load_sheet_names()
 
 st.markdown("""
     <style>
-            font-family: 'Noto Sans Gujarati', sans-serif;
-          .st-emotion-cache-3pwa5w {
-    display: none;}
-           section[data-testid="stSidebar"] .stButton > button {
-    background-color: hsl(217, 91%, 60%) !important;
-    border-color: hsl(217, 91%, 60%) !important;
-    color: white !important;}
+        .st-emotion-cache-3pwa5w { display: none; }
+        section[data-testid="stSidebar"] .stButton > button {
+            background-color: hsl(217, 91%, 60%) !important;
+            border-color: hsl(217, 91%, 60%) !important;
+            color: white !important;
+        }
         .leads-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; table-layout: auto; }
-        .leads-table th { background-color: #34495e; color: white; text-align: center !important; padding: 10px 8px; border: 1px solid #2c3e50; white-space: normal !important; word-wrap: break-word; max-width: 150px; vertical-align: middle}
-        .leads-table td { text-align: center !important; padding: 8px; border: 1px solid #ddd; white-space: normal !important;}
+        .leads-table th { background-color: #34495e; color: white; text-align: center !important; padding: 10px 8px; border: 1px solid #2c3e50; white-space: normal !important; word-wrap: break-word; max-width: 150px; vertical-align: middle }
+        .leads-table td { text-align: center !important; padding: 8px; border: 1px solid #ddd; white-space: normal !important; }
         .leads-table tr:nth-child(even) td { background-color: #f5f5f5; }
         .leads-table tr:hover td { background-color: #eaf4fb; }
     </style>
@@ -370,7 +412,6 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
             all_display = pd.concat(list(project_dfs.values()), ignore_index=True) if project_dfs else pd.DataFrame()
             st.success(f"✅ {len(all_display)} leads found for {date_label}")
 
-            # ✅ દરેક project અલગ table તરીકે show કરો
             for project_name, pdf_df in project_dfs.items():
                 st.subheader(f"📁 {project_name} — {len(pdf_df)} leads")
                 render_centered_table(pdf_df)
@@ -387,8 +428,8 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
                     for project_name, sdf in project_dfs.items():
                         try:
                             pdf_df = sdf.drop(columns=['Project'], errors='ignore').copy()
-                            non_empty_cols = [col for col in pdf_df.columns 
-                                            if pdf_df[col].replace('', pd.NA).notna().any()]
+                            non_empty_cols = [col for col in pdf_df.columns
+                                              if pdf_df[col].replace('', pd.NA).notna().any()]
                             pdf_df = pdf_df[non_empty_cols]
 
                             priority_cols = ['full_name', 'phone']
