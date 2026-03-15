@@ -390,37 +390,36 @@ st.sidebar.markdown("### 📋 Manual Sheet Names")
 st.sidebar.markdown("_This list will be used when auto-fetch is OFF._")
 if "sheet_names" not in st.session_state:
     st.session_state.sheet_names = saved_names if saved_names else ["Gopinathji Grp", "Gopinathji Grp Leads 2"]
-# Delete handling — session_state based
+# Sheet list — delete via checkbox approach
 if "delete_index" not in st.session_state:
     st.session_state.delete_index = None
 
+# Delete execute
 if st.session_state.delete_index is not None:
     idx = st.session_state.delete_index
-    # text_input values session_state માંથી sync કરો
-    updated = []
-    for j in range(len(st.session_state.sheet_names)):
-        val = st.session_state.get(f"sheet_input_{j}", st.session_state.sheet_names[j])
-        updated.append(val)
-    updated.pop(idx)
-    st.session_state.sheet_names = updated
+    if 0 <= idx < len(st.session_state.sheet_names):
+        st.session_state.sheet_names = (
+            st.session_state.sheet_names[:idx] +
+            st.session_state.sheet_names[idx+1:]
+        )
     st.session_state.delete_index = None
     st.rerun()
 
-for i, name in enumerate(st.session_state.sheet_names):
+# Render inputs
+for i in range(len(st.session_state.sheet_names)):
     col_a, col_b = st.sidebar.columns([5, 1])
     with col_a:
-        st.text_input(f"Sheet {i+1}", value=name, key=f"sheet_input_{i}",
-            label_visibility="collapsed", placeholder="Spreadsheet name...")
-    with col_b:
-        if st.button("🗑️", key=f"del_{i}", help="Delete"):
-            st.session_state.delete_index = i
-            st.rerun()
-
-# text_input values sync
-for i in range(len(st.session_state.sheet_names)):
-    val = st.session_state.get(f"sheet_input_{i}")
-    if val is not None:
+        val = st.sidebar.text_input(
+            f"s{i}", 
+            value=st.session_state.sheet_names[i],
+            label_visibility="collapsed",
+            placeholder="Spreadsheet name...",
+            key=f"sinput_{i}"
+        )
         st.session_state.sheet_names[i] = val
+    with col_b:
+        st.sidebar.button("🗑️", key=f"sdel_{i}", 
+            on_click=lambda x=i: st.session_state.update({"delete_index": x}))
 if st.sidebar.button("➕ Add Sheet", use_container_width=True):
     st.session_state.sheet_names.append("")
     st.rerun()
