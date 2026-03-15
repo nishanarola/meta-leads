@@ -292,7 +292,8 @@ sheet_names_list, auto_fetch_active = load_sheet_names()
 st.markdown("""
     <style>
             font-family: 'Noto Sans Gujarati', sans-serif;
-          .st-emotion-cache-3pwa5w { display: none !important;}
+          .st-emotion-cache-3pwa5w {
+    display: none;}
            section[data-testid="stSidebar"] .stButton > button {
     background-color: hsl(217, 91%, 60%) !important;
     border-color: hsl(217, 91%, 60%) !important;
@@ -302,7 +303,6 @@ st.markdown("""
         .leads-table td { text-align: center !important; padding: 8px; border: 1px solid #ddd; white-space: normal !important;}
         .leads-table tr:nth-child(even) td { background-color: #f5f5f5; }
         .leads-table tr:hover td { background-color: #eaf4fb; }
-        
     </style>
 """, unsafe_allow_html=True)
 
@@ -349,6 +349,11 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
 
             all_display = pd.concat(list(project_dfs.values()), ignore_index=True) if project_dfs else pd.DataFrame()
             st.success(f"✅ {len(all_display)} leads found for {date_label}")
+
+            # ✅ દરેક project અલગ table તરીકે show કરો
+            for project_name, pdf_df in project_dfs.items():
+                st.subheader(f"📁 {project_name} — {len(pdf_df)} leads")
+                render_centered_table(pdf_df)
 
             zip_buffer = io.BytesIO()
             final_save_dir = None
