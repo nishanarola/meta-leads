@@ -292,7 +292,7 @@ sheet_names_list, auto_fetch_active = load_sheet_names()
 st.markdown("""
     <style>
             font-family: 'Noto Sans Gujarati', sans-serif;
-          
+          .st-emotion-cache-3pwa5w { display: none !important;}
            section[data-testid="stSidebar"] .stButton > button {
     background-color: hsl(217, 91%, 60%) !important;
     border-color: hsl(217, 91%, 60%) !important;
@@ -302,7 +302,7 @@ st.markdown("""
         .leads-table td { text-align: center !important; padding: 8px; border: 1px solid #ddd; white-space: normal !important;}
         .leads-table tr:nth-child(even) td { background-color: #f5f5f5; }
         .leads-table tr:hover td { background-color: #eaf4fb; }
-        .st-emotion-cache-119tkyc { display: none !important;}
+        
     </style>
 """, unsafe_allow_html=True)
 
