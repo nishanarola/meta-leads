@@ -161,7 +161,7 @@ def generate_pdf(df, report_date, title="Leads Report"):
     header_style = ParagraphStyle(
         'Header',
         fontName=font_name,
-        fontSize=7,
+        fontSize=10,
         alignment=1,
         leading=9,
         textColor=colors.white
@@ -169,7 +169,7 @@ def generate_pdf(df, report_date, title="Leads Report"):
     cell_style = ParagraphStyle(
         'Cell',
         fontName=font_name,
-        fontSize=7,
+        fontSize=9,
         alignment=1,
         leading=9,
         textColor=colors.HexColor('#222222')
@@ -178,7 +178,7 @@ def generate_pdf(df, report_date, title="Leads Report"):
     elements = []
     elements.append(Paragraph(clean_html(title), title_style))
     elements.append(Paragraph(f"Date: {report_date}   |   Total Leads: {len(df)}", subtitle_style))
-    elements.append(Spacer(1, 10*mm))
+    elements.append(Spacer(1, 4*mm))
 
     if not df.empty:
         # Clean column names
@@ -227,8 +227,8 @@ def generate_pdf(df, report_date, title="Leads Report"):
             ('ALIGN',         (0, 0), (-1, -1), 'CENTER'),
             ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
             ('FONTNAME',      (0, 0), (-1, -1), font_name),
-            ('FONTSIZE',      (0, 0), (-1, 0),  8),
-            ('FONTSIZE',      (0, 1), (-1, -1), 7),
+            ('FONTSIZE',      (0, 0), (-1, 0),  10),
+            ('FONTSIZE',      (0, 1), (-1, -1), 9),
             ('TOPPADDING',    (0, 0), (-1, -1), 4),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
             ('LEFTPADDING',   (0, 0), (-1, -1), 3),
