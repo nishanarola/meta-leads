@@ -319,7 +319,7 @@ st.sidebar.divider()
 st.sidebar.markdown("### 📋 Manual Sheet Names")
 
 if "sheet_names" not in st.session_state:
-    st.session_state.sheet_names = saved_names if saved_names else ["Gopinathji Grp", "Gopinathji Grp Leads 2"]
+    st.session_state.sheet_names = saved_names if saved_names else ["Gopinathji Grp"]
 
 # Unique ID based approach — index problem avoid કરો
 # દરેક sheet ને unique id આપો
