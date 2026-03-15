@@ -492,7 +492,12 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
 
             for project_name, pdf_df in project_dfs.items():
                 st.subheader(f"📁 {project_name} — {len(pdf_df)} leads")
-                render_centered_table(pdf_df)
+                # Preview: full_name, phone always last
+                priority = ['full_name', 'phone']
+                other = [c for c in pdf_df.columns if c not in priority]
+                existing_p = [c for c in priority if c in pdf_df.columns]
+                preview_df = pdf_df[other + existing_p].copy()
+                render_centered_table(preview_df)
 
             zip_buffer = io.BytesIO()
             final_save_dir = None
