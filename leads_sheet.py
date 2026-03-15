@@ -177,8 +177,9 @@ def generate_pdf(df, report_date, title="Leads Report"):
 
     elements = []
     elements.append(Paragraph(clean_html(title), title_style))
-    elements.append(Paragraph(f"Date: {report_date}   |   Total Leads: {len(df)}", subtitle_style))
     elements.append(Spacer(1, 14*mm))
+    elements.append(Paragraph(f"Date: {report_date}   |   Total Leads: {len(df)}", subtitle_style))
+    
 
     if not df.empty:
         # Clean column names
