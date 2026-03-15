@@ -65,7 +65,6 @@ def generate_pdf(df, report_date, title="Leads Report"):
         pdf.add_font("MainFont", "", FONT_PATH)
         font_name = "MainFont"
     else:
-        font_name = "Arial"
         font_name = "Helvetica"
 
     page_width = 277
