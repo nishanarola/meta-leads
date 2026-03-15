@@ -134,7 +134,7 @@ def generate_pdf(df, report_date, title="Leads Report"):
                     safe = val.encode('latin-1', errors='replace').decode('latin-1')
                     pdf.cell(col_widths[i], line_height, safe, border=1, align='C', fill=True)
 
-            pdf.ln()
+            pdf.set_xy(pdf.l_margin, row_y + row_height)
 
     return pdf.output()
 
