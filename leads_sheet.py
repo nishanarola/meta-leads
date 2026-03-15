@@ -385,6 +385,7 @@ saved_names, saved_auto = load_sheet_names()
 auto_fetch = saved_auto
 st.sidebar.divider()
 st.sidebar.markdown("### 📋 Manual Sheet Names")
+st.sidebar.markdown("_This list will be used when auto-fetch is OFF._")
 if "sheet_names" not in st.session_state:
     st.session_state.sheet_names = saved_names if saved_names else ["Gopinathji Grp", "Gopinathji Grp Leads 2"]
 to_delete = None
@@ -430,25 +431,16 @@ sheet_names_list, auto_fetch_active = load_sheet_names()
 
 st.markdown("""
     <style>
-    
         section[data-testid="stSidebar"] .stButton > button {
             background-color: hsl(217, 91%, 60%) !important;
             border-color: hsl(217, 91%, 60%) !important;
             color: white !important;
         }
-        .leads-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; table-layout: auto; }
-        .leads-table th { background-color: #34495e; color: white; text-align: center !important; padding: 10px 8px; border: 1px solid #2c3e50; white-space: normal !important; word-wrap: break-word; max-width: 150px; vertical-align: middle }
-        .leads-table td { text-align: center !important; padding: 8px; border: 1px solid #ddd; white-space: normal !important; }
-        .leads-table tr:nth-child(even) td { background-color: #f5f5f5; }
-        .leads-table tr:hover td { background-color: #eaf4fb; }
+
     </style>
 """, unsafe_allow_html=True)
 
-def render_centered_table(df):
-    display_df = df.copy()
-    display_df.columns = [clean_col_name(c) for c in display_df.columns]
-    html = display_df.to_html(index=False, classes="leads-table", border=0, escape=False)
-    st.markdown(html, unsafe_allow_html=True)
+
 
 if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
     sheet_names_list, auto_fetch_active = load_sheet_names()
@@ -490,14 +482,7 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
             all_display = pd.concat(list(project_dfs.values()), ignore_index=True) if project_dfs else pd.DataFrame()
             st.success(f"✅ {len(all_display)} leads found for {date_label}")
 
-            for project_name, pdf_df in project_dfs.items():
-                st.subheader(f"📁 {project_name} — {len(pdf_df)} leads")
-                # Preview: full_name, phone always last
-                priority = ['full_name', 'phone']
-                other = [c for c in pdf_df.columns if c not in priority]
-                existing_p = [c for c in priority if c in pdf_df.columns]
-                preview_df = pdf_df[other + existing_p].copy()
-                render_centered_table(preview_df)
+
 
             zip_buffer = io.BytesIO()
             final_save_dir = None
