@@ -147,7 +147,7 @@ def generate_pdf(df, report_date, title="Leads Report"):
         fontName=font_name,
         fontSize=16,
         alignment=1,
-        spaceAfter=3,
+        spaceAfter=8,
         textColor=colors.HexColor('#1a1a2e')
     )
     subtitle_style = ParagraphStyle(
@@ -155,7 +155,7 @@ def generate_pdf(df, report_date, title="Leads Report"):
         fontName=font_name,
         fontSize=11,
         alignment=1,
-        spaceAfter=8,
+        spaceAfter=4,
         textColor=colors.HexColor('#555555')
     )
     header_style = ParagraphStyle(
@@ -177,9 +177,8 @@ def generate_pdf(df, report_date, title="Leads Report"):
 
     elements = []
     elements.append(Paragraph(clean_html(title), title_style))
-    elements.append(Spacer(1, 5*mm))
     elements.append(Paragraph(f"Date: {report_date}   |   Total Leads: {len(df)}", subtitle_style))
-     elements.append(Spacer(1, 14*mm))
+    elements.append(Spacer(1, 14*mm))
 
     if not df.empty:
         # Clean column names
