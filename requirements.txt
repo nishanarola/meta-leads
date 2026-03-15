@@ -1,6 +1,7 @@
 streamlit
 pandas
 fpdf2
+reportlab
 gspread
 oauth2client
 requests
