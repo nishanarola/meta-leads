@@ -322,49 +322,47 @@ st.sidebar.markdown("_This list will be used when auto-fetch is OFF._")
 if "sheet_names" not in st.session_state:
     st.session_state.sheet_names = saved_names if saved_names else ["Gopinathji Grp", "Gopinathji Grp Leads 2"]
 
-# sinput_ widget keys માંથી latest values session_state માં sync કરો
-def sync_from_widgets():
-    updated = []
-    for k in range(len(st.session_state.sheet_names)):
-        val = st.session_state.get(f"sinput_{k}", st.session_state.sheet_names[k])
-        updated.append(val)
-    st.session_state.sheet_names = updated
+# Unique ID based approach — index problem avoid કરો
+# દરેક sheet ને unique id આપો
+if "sheet_ids" not in st.session_state or len(st.session_state.sheet_ids) != len(st.session_state.sheet_names):
+    import uuid
+    st.session_state.sheet_ids = [str(uuid.uuid4())[:8] for _ in st.session_state.sheet_names]
 
-# Delete tracking
-names_copy = list(st.session_state.sheet_names)
-delete_index = None
-for i, name in enumerate(names_copy):
+delete_id = None
+for uid, name in zip(st.session_state.sheet_ids, st.session_state.sheet_names):
     cols = st.sidebar.columns([5, 1])
-    cols[0].text_input(
-        f"s{i}",
+    # key = uid based — unique per sheet, not index based
+    new_val = cols[0].text_input(
+        uid,
+        value=name,
         label_visibility="collapsed",
         placeholder="Spreadsheet name...",
-        key=f"sinput_{i}",
-        value=name
+        key=f"sheet_{uid}"
     )
-    if cols[1].button("🗑️", key=f"sdel_{i}"):
-        delete_index = i
+    # directly update name as user types
+    idx = st.session_state.sheet_ids.index(uid)
+    st.session_state.sheet_names[idx] = new_val
+    if cols[1].button("🗑️", key=f"del_{uid}"):
+        delete_id = uid
 
-# Delete after loop — sync first, then pop correct index, then clear widget keys
-if delete_index is not None:
-    sync_from_widgets()
-    st.session_state.sheet_names.pop(delete_index)
-    total = len(st.session_state.sheet_names) + 1
-    for k in range(total):
-        st.session_state.pop(f"sinput_{k}", None)
+if delete_id is not None:
+    idx = st.session_state.sheet_ids.index(delete_id)
+    st.session_state.sheet_names.pop(idx)
+    st.session_state.sheet_ids.pop(idx)
     st.rerun()
 
 if st.sidebar.button("➕ Add Sheet", use_container_width=True):
-    sync_from_widgets()
+    import uuid
     st.session_state.sheet_names.append("")
+    st.session_state.sheet_ids.append(str(uuid.uuid4())[:8])
     st.rerun()
 
 st.sidebar.divider()
 
 if st.sidebar.button("💾 Save Settings", use_container_width=True, type="primary"):
-    sync_from_widgets()
     clean_names = [n.strip() for n in st.session_state.sheet_names if n.strip()]
     st.session_state.sheet_names = clean_names
+    st.session_state.sheet_ids = [st.session_state.sheet_ids[i] for i, n in enumerate(st.session_state.sheet_names) if n.strip()]
     save_sheet_names(clean_names, auto_fetch)
     st.sidebar.success(f"✅ Saved! {len(clean_names)} sheets")
     st.rerun()
