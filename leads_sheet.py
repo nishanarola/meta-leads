@@ -68,7 +68,6 @@ def download_font():
 FONT_AVAILABLE = download_font()
 
 def normalize_unicode(text):
-    """𝟑_𝐁𝐇𝐊 જેવા mathematical bold/italic unicode ને normal ASCII માં convert કરો"""
     import unicodedata
     result = []
     for ch in text:
@@ -93,7 +92,6 @@ def normalize_unicode(text):
     return ''.join(result)
 
 def clean_html(text):
-    """HTML tags remove કરો, plain text રાખો"""
     text = str(text)
     text = normalize_unicode(text)
     text = re.sub(r'<[^>]+>', '', text)
@@ -106,7 +104,6 @@ def clean_html(text):
     return text
 
 def clean_col_name(col):
-    """Column name clean કરો — underscore ને space માં"""
     col = str(col)
     col = col.replace('_', ' ').strip()
     return col
@@ -131,38 +128,10 @@ def generate_pdf(df, report_date, title="Leads Report"):
         bottomMargin=10*mm
     )
 
-    title_style = ParagraphStyle(
-        'CustomTitle',
-        fontName=font_name,
-        fontSize=16,
-        alignment=1,
-        spaceAfter=8,
-        textColor=colors.HexColor('#1a1a2e')
-    )
-    subtitle_style = ParagraphStyle(
-        'Subtitle',
-        fontName=font_name,
-        fontSize=11,
-        alignment=1,
-        spaceAfter=4,
-        textColor=colors.HexColor('#555555')
-    )
-    header_style = ParagraphStyle(
-        'Header',
-        fontName=font_name,
-        fontSize=10,
-        alignment=1,
-        leading=13,
-        textColor=colors.white
-    )
-    cell_style = ParagraphStyle(
-        'Cell',
-        fontName=font_name,
-        fontSize=9,
-        alignment=1,
-        leading=12,
-        textColor=colors.HexColor('#222222')
-    )
+    title_style = ParagraphStyle('CustomTitle', fontName=font_name, fontSize=16, alignment=1, spaceAfter=8, textColor=colors.HexColor('#1a1a2e'))
+    subtitle_style = ParagraphStyle('Subtitle', fontName=font_name, fontSize=11, alignment=1, spaceAfter=4, textColor=colors.HexColor('#555555'))
+    header_style = ParagraphStyle('Header', fontName=font_name, fontSize=10, alignment=1, leading=13, textColor=colors.white)
+    cell_style = ParagraphStyle('Cell', fontName=font_name, fontSize=9, alignment=1, leading=12, textColor=colors.HexColor('#222222'))
 
     elements = []
     elements.append(Paragraph(clean_html(title), title_style))
@@ -171,19 +140,13 @@ def generate_pdf(df, report_date, title="Leads Report"):
 
     if not df.empty:
         clean_cols = [clean_col_name(c) for c in df.columns]
-
         header_row = [Paragraph(c, header_style) for c in clean_cols]
-
         data_rows = []
         for _, row in df.iterrows():
-            data_rows.append([
-                Paragraph(clean_html(v), cell_style) for v in row
-            ])
+            data_rows.append([Paragraph(clean_html(v), cell_style) for v in row])
 
         table_data = [header_row] + data_rows
-
         page_w = landscape(A4)[0] - 16*mm
-        col_count = len(df.columns)
 
         raw_widths = []
         for col in df.columns:
@@ -221,7 +184,6 @@ def generate_pdf(df, report_date, title="Leads Report"):
             ('GRID',          (0, 0), (-1, -1), 0.4, colors.HexColor('#cccccc')),
             ('LINEBELOW',     (0, 0), (-1, 0),  1,   colors.HexColor('#2c3e50')),
         ]))
-
         elements.append(table)
 
     doc.build(elements)
@@ -267,7 +229,6 @@ def parse_to_ist(series):
     return pd.Series(results, index=series.index)
 
 def clean_cell_value(val):
-    """Individual cell value clean"""
     if pd.isna(val):
         return ''
     s = str(val).strip()
@@ -349,7 +310,7 @@ def load_all_sheets(sheet_names_list, auto_fetch_all):
         return None
     return pd.concat(all_dfs, ignore_index=True)
 
-# Sidebar
+# ── Sidebar ──────────────────────────────────────────────
 st.sidebar.image("enacle-logo.png", width=150)
 st.sidebar.markdown("## ⚙️ Settings")
 saved_names, saved_auto = load_sheet_names()
@@ -357,36 +318,55 @@ auto_fetch = saved_auto
 st.sidebar.divider()
 st.sidebar.markdown("### 📋 Manual Sheet Names")
 st.sidebar.markdown("_This list will be used when auto-fetch is OFF._")
+
 if "sheet_names" not in st.session_state:
     st.session_state.sheet_names = saved_names if saved_names else ["Gopinathji Grp", "Gopinathji Grp Leads 2"]
+
+# sinput_ widget keys માંથી latest values session_state માં sync કરો
+def sync_from_widgets():
+    updated = []
+    for k in range(len(st.session_state.sheet_names)):
+        val = st.session_state.get(f"sinput_{k}", st.session_state.sheet_names[k])
+        updated.append(val)
+    st.session_state.sheet_names = updated
+
+# Delete tracking
 names_copy = list(st.session_state.sheet_names)
+delete_index = None
 for i, name in enumerate(names_copy):
     cols = st.sidebar.columns([5, 1])
-    cols[0].text_input(f"s{i}", value=name, label_visibility="collapsed", placeholder="Spreadsheet name...", key=f"sinput_{i}")
+    cols[0].text_input(
+        f"s{i}",
+        label_visibility="collapsed",
+        placeholder="Spreadsheet name...",
+        key=f"sinput_{i}",
+        value=name
+    )
     if cols[1].button("🗑️", key=f"sdel_{i}"):
-        # પહેલાં sinput_ keys માંથી latest values sync કરો, પછી selected index delete કરો
-        updated = []
-        for k in range(len(st.session_state.sheet_names)):
-            val = st.session_state.get(f"sinput_{k}", "").strip()
-            updated.append(val)
-        updated.pop(i)
-        st.session_state.sheet_names = updated
-        st.rerun()
+        delete_index = i
+
+# Delete after loop — sync first, then pop correct index, then clear widget keys
+if delete_index is not None:
+    sync_from_widgets()
+    st.session_state.sheet_names.pop(delete_index)
+    total = len(st.session_state.sheet_names) + 1
+    for k in range(total):
+        st.session_state.pop(f"sinput_{k}", None)
+    st.rerun()
+
 if st.sidebar.button("➕ Add Sheet", use_container_width=True):
+    sync_from_widgets()
     st.session_state.sheet_names.append("")
     st.rerun()
+
 st.sidebar.divider()
 
-# ✅ FIXED: Save Settings — sinput_ keys માંથી latest values વાંચે છે
 if st.sidebar.button("💾 Save Settings", use_container_width=True, type="primary"):
-    updated_names = []
-    for i in range(len(st.session_state.sheet_names)):
-        val = st.session_state.get(f"sinput_{i}", "").strip()
-        if val:
-            updated_names.append(val)
-    st.session_state.sheet_names = updated_names
-    save_sheet_names(updated_names, auto_fetch)
-    st.sidebar.success(f"✅ Saved! {len(updated_names)} sheets")
+    sync_from_widgets()
+    clean_names = [n.strip() for n in st.session_state.sheet_names if n.strip()]
+    st.session_state.sheet_names = clean_names
+    save_sheet_names(clean_names, auto_fetch)
+    st.sidebar.success(f"✅ Saved! {len(clean_names)} sheets")
     st.rerun()
 
 current_names, current_auto = load_sheet_names()
@@ -396,7 +376,7 @@ if current_names:
     for n in current_names:
         st.sidebar.markdown(f"• {n}")
 
-
+# ── Main ──────────────────────────────────────────────────
 ist = pytz.timezone('Asia/Kolkata')
 now_ist = datetime.now(ist)
 yesterday_default = (now_ist - timedelta(1)).date()
@@ -418,7 +398,6 @@ st.markdown("""
         }
     </style>
 """, unsafe_allow_html=True)
-
 
 
 if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
