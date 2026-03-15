@@ -390,20 +390,37 @@ st.sidebar.markdown("### 📋 Manual Sheet Names")
 st.sidebar.markdown("_This list will be used when auto-fetch is OFF._")
 if "sheet_names" not in st.session_state:
     st.session_state.sheet_names = saved_names if saved_names else ["Gopinathji Grp", "Gopinathji Grp Leads 2"]
-to_delete = None
+# Delete handling — session_state based
+if "delete_index" not in st.session_state:
+    st.session_state.delete_index = None
+
+if st.session_state.delete_index is not None:
+    idx = st.session_state.delete_index
+    # text_input values session_state માંથી sync કરો
+    updated = []
+    for j in range(len(st.session_state.sheet_names)):
+        val = st.session_state.get(f"sheet_input_{j}", st.session_state.sheet_names[j])
+        updated.append(val)
+    updated.pop(idx)
+    st.session_state.sheet_names = updated
+    st.session_state.delete_index = None
+    st.rerun()
+
 for i, name in enumerate(st.session_state.sheet_names):
     col_a, col_b = st.sidebar.columns([5, 1])
     with col_a:
-        new_val = st.text_input(f"Sheet {i+1}", value=name, key=f"sheet_input_{i}",
+        st.text_input(f"Sheet {i+1}", value=name, key=f"sheet_input_{i}",
             label_visibility="collapsed", placeholder="Spreadsheet name...")
-        st.session_state.sheet_names[i] = new_val
     with col_b:
-        if st.button("🗑️", key=f"del_{name}_{i}", help="Delete"):
-            to_delete = i
-if to_delete is not None:
-    st.session_state.sheet_names.pop(to_delete)
-    st.session_state.sheet_names = [n for n in st.session_state.sheet_names]
-    st.rerun()
+        if st.button("🗑️", key=f"del_{i}", help="Delete"):
+            st.session_state.delete_index = i
+            st.rerun()
+
+# text_input values sync
+for i in range(len(st.session_state.sheet_names)):
+    val = st.session_state.get(f"sheet_input_{i}")
+    if val is not None:
+        st.session_state.sheet_names[i] = val
 if st.sidebar.button("➕ Add Sheet", use_container_width=True):
     st.session_state.sheet_names.append("")
     st.rerun()
