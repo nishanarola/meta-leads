@@ -305,6 +305,7 @@ sheet_names_list, auto_fetch_active = load_sheet_names()
 
 st.markdown("""
     <style>
+            font-family: 'Noto Sans Gujarati', sans-serif;
           .st-emotion-cache-3pwa5w {
     display: none;}
            section[data-testid="stSidebar"] .stButton > button {
