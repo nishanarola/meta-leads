@@ -60,24 +60,12 @@ def generate_pdf(df, report_date, title="Leads Report"):
     pdf = FPDF(orientation='L', unit='mm', format='A4')
     pdf.add_page()
     
-    DEJAVU_PATH = "DejaVuSans.ttf"
-    if not os.path.exists(DEJAVU_PATH):
-        try:
-            r = requests.get(
-                "https://github.com/dejavu-fonts/dejavu-fonts/releases/download/version_2_37/dejavu-fonts-ttf-2.37.tar.bz2",
-                timeout=15
-            )
-        except:
-            pass
-    
-    # DejaVu ને બદલે સીધું Noto Sans Gujarati વાપરો
     if FONT_AVAILABLE:
-        pdf.add_font("MainFont", "", FONT_PATH, uni=True)
-        font_name = "MainFont"
-    elif os.path.exists(DEJAVU_PATH):
-        pdf.add_font("MainFont", "", DEJAVU_PATH, uni=True)
+        # fpdf2 માં 'uni=True' ની જરૂર નથી, તે ઓટોમેટિક હોય છે
+        pdf.add_font("MainFont", "", FONT_PATH)
         font_name = "MainFont"
     else:
+        font_name = "Arial"
         font_name = "Arial"
     page_width = 277
     pdf.set_font(font_name, size=18)
@@ -129,7 +117,6 @@ def generate_pdf(df, report_date, title="Leads Report"):
             max_lines = 1
             for i, col in enumerate(df.columns):
                 val = str(df.iloc[row_idx][col])
-                val = ''.join(c if ord(c) < 128 or '\u0A80' <= c <= '\u0AFF' else '?' for c in val)
                 chars_per_line = max(1, int(col_widths[i] / 2.2))
                 lines = max(1, -(-len(val) // chars_per_line))
                 if lines > max_lines:
