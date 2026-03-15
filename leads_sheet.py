@@ -378,43 +378,44 @@ def load_all_sheets(sheet_names_list, auto_fetch_all):
         return None
     return pd.concat(all_dfs, ignore_index=True)
 
-with st.sidebar:
-    st.image("enacle-logo.png", width=150)
-    st.header("Settings")
-    saved_names, saved_auto = load_sheet_names()
-    auto_fetch = saved_auto
-    st.divider()
-    st.subheader("Manual Sheet Names")
-    st.caption("This list will be used when auto-fetch is OFF.")
-    if "sheet_names" not in st.session_state:
-        st.session_state.sheet_names = saved_names if saved_names else ["Gopinathji Grp"]
-    to_delete = None
-    for i, name in enumerate(st.session_state.sheet_names):
-        col_a, col_b = st.columns([5, 1])
-        with col_a:
-            new_val = st.text_input(f"Sheet {i+1}", value=name, key=f"sheet_input_{i}",
-                label_visibility="collapsed", placeholder="Spreadsheet name...")
-            st.session_state.sheet_names[i] = new_val
-        with col_b:
-            if st.button("🗑️", key=f"del_{i}", help="Delete"):
-                to_delete = i
-    if to_delete is not None:
-        st.session_state.sheet_names.pop(to_delete)
-        st.rerun()
-    if st.button("➕ Add Sheet", use_container_width=True):
-        st.session_state.sheet_names.append("")
-        st.rerun()
-    st.divider()
-    if st.button("💾 Save Settings", use_container_width=True, type="primary"):
-        clean_names = [n.strip() for n in st.session_state.sheet_names if n.strip()]
-        save_sheet_names(clean_names, auto_fetch)
-        st.success(f"✅ Saved! {len(clean_names)} sheets")
-    current_names, current_auto = load_sheet_names()
-    if current_names:
-        st.divider()
-        st.caption("📌 Currently Saved:")
-        for n in current_names:
-            st.caption(f"• {n}")
+# Sidebar
+st.sidebar.image("enacle-logo.png", width=150)
+st.sidebar.markdown("## ⚙️ Settings")
+saved_names, saved_auto = load_sheet_names()
+auto_fetch = saved_auto
+st.sidebar.divider()
+st.sidebar.markdown("### 📋 Manual Sheet Names")
+st.sidebar.markdown("_This list will be used when auto-fetch is OFF._")
+if "sheet_names" not in st.session_state:
+    st.session_state.sheet_names = saved_names if saved_names else ["Gopinathji Grp", "Gopinathji Grp Leads 2"]
+to_delete = None
+for i, name in enumerate(st.session_state.sheet_names):
+    col_a, col_b = st.sidebar.columns([5, 1])
+    with col_a:
+        new_val = st.text_input(f"Sheet {i+1}", value=name, key=f"sheet_input_{i}",
+            label_visibility="collapsed", placeholder="Spreadsheet name...")
+        st.session_state.sheet_names[i] = new_val
+    with col_b:
+        if st.button("🗑️", key=f"del_{i}", help="Delete"):
+            to_delete = i
+if to_delete is not None:
+    st.session_state.sheet_names.pop(to_delete)
+    st.rerun()
+if st.sidebar.button("➕ Add Sheet", use_container_width=True):
+    st.session_state.sheet_names.append("")
+    st.rerun()
+st.sidebar.divider()
+if st.sidebar.button("💾 Save Settings", use_container_width=True, type="primary"):
+    clean_names = [n.strip() for n in st.session_state.sheet_names if n.strip()]
+    save_sheet_names(clean_names, auto_fetch)
+    st.sidebar.success(f"✅ Saved! {len(clean_names)} sheets")
+current_names, current_auto = load_sheet_names()
+if current_names:
+    st.sidebar.divider()
+    st.sidebar.markdown("**📌 Currently Saved:**")
+    for n in current_names:
+        st.sidebar.markdown(f"• {n}")
+
 
 ist = pytz.timezone('Asia/Kolkata')
 now_ist = datetime.now(ist)
