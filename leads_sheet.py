@@ -390,36 +390,20 @@ st.sidebar.markdown("### 📋 Manual Sheet Names")
 st.sidebar.markdown("_This list will be used when auto-fetch is OFF._")
 if "sheet_names" not in st.session_state:
     st.session_state.sheet_names = saved_names if saved_names else ["Gopinathji Grp", "Gopinathji Grp Leads 2"]
-# Sheet list — delete via checkbox approach
-if "delete_index" not in st.session_state:
-    st.session_state.delete_index = None
-
-# Delete execute
-if st.session_state.delete_index is not None:
-    idx = st.session_state.delete_index
-    if 0 <= idx < len(st.session_state.sheet_names):
-        st.session_state.sheet_names = (
-            st.session_state.sheet_names[:idx] +
-            st.session_state.sheet_names[idx+1:]
-        )
-    st.session_state.delete_index = None
-    st.rerun()
-
-# Render inputs
+# Sheet inputs
 for i in range(len(st.session_state.sheet_names)):
-    col_a, col_b = st.sidebar.columns([5, 1])
-    with col_a:
-        val = st.sidebar.text_input(
-            f"s{i}", 
-            value=st.session_state.sheet_names[i],
-            label_visibility="collapsed",
-            placeholder="Spreadsheet name...",
-            key=f"sinput_{i}"
-        )
-        st.session_state.sheet_names[i] = val
-    with col_b:
-        st.sidebar.button("🗑️", key=f"sdel_{i}", 
-            on_click=lambda x=i: st.session_state.update({"delete_index": x}))
+    cols = st.sidebar.columns([5, 1])
+    updated = cols[0].text_input(
+        f"s{i}",
+        value=st.session_state.sheet_names[i],
+        label_visibility="collapsed",
+        placeholder="Spreadsheet name...",
+        key=f"sinput_{i}"
+    )
+    st.session_state.sheet_names[i] = updated
+    if cols[1].button("🗑️", key=f"sdel_{i}"):
+        st.session_state.sheet_names.pop(i)
+        st.rerun()
 if st.sidebar.button("➕ Add Sheet", use_container_width=True):
     st.session_state.sheet_names.append("")
     st.rerun()
