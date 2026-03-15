@@ -63,10 +63,10 @@ def generate_pdf(df, report_date, title="Leads Report"):
     DEJAVU_PATH = "DejaVuSans.ttf"
     if not os.path.exists(DEJAVU_PATH):
         try:
-            r = requests.get("https://github.com/dejavu-fonts/dejavu-fonts/raw/master/ttf/DejaVuSans.ttf", timeout=10)
-            if r.status_code == 200:
-                with open(DEJAVU_PATH, "wb") as f:
-                    f.write(r.content)
+            r = requests.get(
+                "https://github.com/dejavu-fonts/dejavu-fonts/releases/download/version_2_37/dejavu-fonts-ttf-2.37.tar.bz2",
+                timeout=15
+            )
         except:
             pass
     
