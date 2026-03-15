@@ -117,7 +117,7 @@ def generate_pdf(df, report_date, title="Leads Report"):
             max_lines = 1
             for i, col in enumerate(df.columns):
                 val = str(df.iloc[row_idx][col])
-                chars_per_line = max(1, int(col_widths[i] / 2.2))
+                chars_per_line = max(1, int(col_widths[i] / 2.5))
                 lines = max(1, -(-len(val) // chars_per_line))
                 if lines > max_lines:
                     max_lines = lines
@@ -130,9 +130,13 @@ def generate_pdf(df, report_date, title="Leads Report"):
                 num_lines = max(1, -(-len(val) // chars_per_line))
                 cell_line_h = row_height / num_lines
                 pdf.set_xy(x, row_y)
-                pdf.rect(x, row_y, col_widths[i], row_height, 'FD')
-                pdf.set_xy(x, row_y)
+            pdf.rect(x, row_y, col_widths[i], row_height, 'FD')
+            pdf.set_xy(x, row_y + (row_height - cell_line_h) / 2)
+            try:
                 pdf.multi_cell(col_widths[i], cell_line_h, val, 0, 'C')
+            except Exception:
+                safe_val = val.encode('latin-1', errors='replace').decode('latin-1')
+                pdf.multi_cell(col_widths[i], cell_line_h, safe_val, 0, 'C')
 
             pdf.set_xy(pdf.l_margin, row_y + row_height)
 
