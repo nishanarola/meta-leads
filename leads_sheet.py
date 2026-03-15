@@ -70,22 +70,16 @@ FONT_AVAILABLE = download_font()
 def normalize_unicode(text):
     """𝟑_𝐁𝐇𝐊 જેવા mathematical bold/italic unicode ને normal ASCII માં convert કરો"""
     import unicodedata
-    # Mathematical bold/italic/script chars ને normal chars map કરો
     result = []
     for ch in text:
         cp = ord(ch)
-        # Mathematical Bold Capital A-Z: U+1D400–U+1D419
         if 0x1D400 <= cp <= 0x1D419:
             result.append(chr(cp - 0x1D400 + ord('A')))
-        # Mathematical Bold Small a-z: U+1D41A–U+1D433
         elif 0x1D41A <= cp <= 0x1D433:
             result.append(chr(cp - 0x1D41A + ord('a')))
-        # Mathematical Bold Digits 0-9: U+1D7CE–U+1D7D7
         elif 0x1D7CE <= cp <= 0x1D7D7:
             result.append(chr(cp - 0x1D7CE + ord('0')))
-        # Mathematical Bold Italic / Script variants (common ranges)
         elif 0x1D434 <= cp <= 0x1D503:
-            # Italic/bold-italic A-Z and a-z
             offset = cp - 0x1D434
             if offset < 26:
                 result.append(chr(offset + ord('A')))
@@ -94,7 +88,6 @@ def normalize_unicode(text):
             else:
                 result.append(unicodedata.normalize('NFKC', ch) or ch)
         else:
-            # NFKC normalization — rest of fancy unicode handle કરો
             normalized = unicodedata.normalize('NFKC', ch)
             result.append(normalized)
     return ''.join(result)
@@ -102,15 +95,12 @@ def normalize_unicode(text):
 def clean_html(text):
     """HTML tags remove કરો, plain text રાખો"""
     text = str(text)
-    # Mathematical bold/fancy unicode normalize કરો
     text = normalize_unicode(text)
-    text = re.sub(r'<[^>]+>', '', text)   # HTML tags remove
+    text = re.sub(r'<[^>]+>', '', text)
     text = text.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>').replace('&nbsp;', ' ')
     text = text.strip()
-    # Empty/placeholder values
     if text in ('nan', 'None', 'NaT', 'none', 'NaN', '_', "'_'", "'-'", '-', "''", '""'):
         return ''
-    # Single quotes around underscore or dash — Google Sheets placeholder
     if re.match(r"^['\"]?[-_]+['\"]?$", text):
         return ''
     return text
@@ -124,7 +114,6 @@ def clean_col_name(col):
 def generate_pdf(df, report_date, title="Leads Report"):
     buffer = io.BytesIO()
 
-    # Font setup
     font_name = "Helvetica"
     if FONT_AVAILABLE and os.path.exists(FONT_PATH):
         try:
@@ -181,13 +170,10 @@ def generate_pdf(df, report_date, title="Leads Report"):
     elements.append(Spacer(1, 4*mm))
 
     if not df.empty:
-        # Clean column names
         clean_cols = [clean_col_name(c) for c in df.columns]
 
-        # Header row
         header_row = [Paragraph(c, header_style) for c in clean_cols]
 
-        # Data rows — HTML clean કરો
         data_rows = []
         for _, row in df.iterrows():
             data_rows.append([
@@ -196,11 +182,9 @@ def generate_pdf(df, report_date, title="Leads Report"):
 
         table_data = [header_row] + data_rows
 
-        # Column widths
         page_w = landscape(A4)[0] - 16*mm
         col_count = len(df.columns)
 
-        # Smart widths based on column type
         raw_widths = []
         for col in df.columns:
             c = col.lower()
@@ -220,10 +204,8 @@ def generate_pdf(df, report_date, title="Leads Report"):
 
         table = Table(table_data, colWidths=col_widths, repeatRows=1)
         table.setStyle(TableStyle([
-            # Header
             ('BACKGROUND',    (0, 0), (-1, 0),  colors.HexColor('#34495e')),
             ('TEXTCOLOR',     (0, 0), (-1, 0),  colors.white),
-            # All cells
             ('ALIGN',         (0, 0), (-1, -1), 'CENTER'),
             ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
             ('FONTNAME',      (0, 0), (-1, -1), font_name),
@@ -235,9 +217,7 @@ def generate_pdf(df, report_date, title="Leads Report"):
             ('BOTTOMPADDING', (0, 1), (-1, -1), 7),
             ('LEFTPADDING',   (0, 0), (-1, -1), 3),
             ('RIGHTPADDING',  (0, 0), (-1, -1), 3),
-            # Alternating rows
             ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f5f5f5'), colors.white]),
-            # Grid
             ('GRID',          (0, 0), (-1, -1), 0.4, colors.HexColor('#cccccc')),
             ('LINEBELOW',     (0, 0), (-1, 0),  1,   colors.HexColor('#2c3e50')),
         ]))
@@ -292,24 +272,15 @@ def clean_cell_value(val):
         return ''
     s = str(val).strip()
     s = normalize_unicode(s)
-    # pure placeholder values
     if s in ('nan', 'None', 'NaT', 'none', 'NaN', '_', "'_'", "'-'", '-', 'false', 'FALSE', 'null', 'NULL'):
         return ''
     if re.match(r"^[\'\"]?[-_]+[\'\"]?$", s):
         return ''
-    # test/dummy rows mark
     if s.lower().startswith('<test lead') or 'dummy data' in s.lower():
         return '__TEST_ROW__'
-    # trailing underscores remove: "3_" → "3"
     s = re.sub(r'_+$', '', s)
-    # middle underscores → space: "3_BHK" → "3 BHK", "full_name" → "full name"
     s = re.sub(r'_+', ' ', s)
     return s.strip()
-
-
-def clean_col_name(col):
-    return str(col).replace('_', ' ').strip()
-
 
 
 def load_all_sheets(sheet_names_list, auto_fetch_all):
@@ -346,11 +317,9 @@ def load_all_sheets(sheet_names_list, auto_fetch_all):
                     continue
                 df = pd.DataFrame(rows, columns=headers)
                 df = df.replace('', pd.NA)
-                # બધા string columns clean કરો
                 for col in df.columns:
                     df[col] = df[col].apply(lambda x: clean_cell_value(x) if pd.notna(x) else x)
                     df[col] = df[col].replace('', pd.NA)
-                # Test/dummy rows filter કરો
                 mask = df.apply(lambda row: row.astype(str).str.contains('__TEST_ROW__').any(), axis=1)
                 df = df[~mask].reset_index(drop=True)
                 if 'created_time' not in df.columns:
@@ -401,10 +370,19 @@ if st.sidebar.button("➕ Add Sheet", use_container_width=True):
     st.session_state.sheet_names.append("")
     st.rerun()
 st.sidebar.divider()
+
+# ✅ FIXED: Save Settings — sinput_ keys માંથી latest values વાંચે છે
 if st.sidebar.button("💾 Save Settings", use_container_width=True, type="primary"):
-    clean_names = [n.strip() for n in st.session_state.sheet_names if n.strip()]
-    save_sheet_names(clean_names, auto_fetch)
-    st.sidebar.success(f"✅ Saved! {len(clean_names)} sheets")
+    updated_names = []
+    for i in range(len(st.session_state.sheet_names)):
+        val = st.session_state.get(f"sinput_{i}", "").strip()
+        if val:
+            updated_names.append(val)
+    st.session_state.sheet_names = updated_names
+    save_sheet_names(updated_names, auto_fetch)
+    st.sidebar.success(f"✅ Saved! {len(updated_names)} sheets")
+    st.rerun()
+
 current_names, current_auto = load_sheet_names()
 if current_names:
     st.sidebar.divider()
@@ -432,7 +410,6 @@ st.markdown("""
             border-color: hsl(217, 91%, 60%) !important;
             color: white !important;
         }
-
     </style>
 """, unsafe_allow_html=True)
 
@@ -478,7 +455,6 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
             all_display = pd.concat(list(project_dfs.values()), ignore_index=True) if project_dfs else pd.DataFrame()
             st.success(f"✅ {len(all_display)} leads found for {date_label}")
 
-            # દરેક spreadsheet ના leads અલગ અલગ generate કરો
             try:
                 month_folder = target_date.strftime('%B_%Y')
                 final_save_dir = os.path.join(save_folder, month_folder, date_label)
@@ -486,7 +462,6 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
             except:
                 final_save_dir = None
 
-            # Sheet-wise PDF generate અને individual download button
             for sname in found_spreadsheets:
                 sheet_projects = {k: v for k, v in project_dfs.items()
                                   if filtered[filtered['_spreadsheet'] == sname]['Project'].isin([k]).any()}
