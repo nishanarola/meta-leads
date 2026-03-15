@@ -364,7 +364,13 @@ for i, name in enumerate(names_copy):
     cols = st.sidebar.columns([5, 1])
     cols[0].text_input(f"s{i}", value=name, label_visibility="collapsed", placeholder="Spreadsheet name...", key=f"sinput_{i}")
     if cols[1].button("🗑️", key=f"sdel_{i}"):
-        st.session_state.sheet_names = [n for j,n in enumerate(st.session_state.sheet_names) if j != i]
+        # પહેલાં sinput_ keys માંથી latest values sync કરો, પછી selected index delete કરો
+        updated = []
+        for k in range(len(st.session_state.sheet_names)):
+            val = st.session_state.get(f"sinput_{k}", "").strip()
+            updated.append(val)
+        updated.pop(i)
+        st.session_state.sheet_names = updated
         st.rerun()
 if st.sidebar.button("➕ Add Sheet", use_container_width=True):
     st.session_state.sheet_names.append("")
