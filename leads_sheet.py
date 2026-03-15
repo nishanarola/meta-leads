@@ -299,6 +299,7 @@ def clean_cell_value(val):
     return s
 
 
+def load_all_sheets(sheet_names_list, auto_fetch_all):
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     creds_dict = dict(st.secrets["gcp_service_account"])
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
