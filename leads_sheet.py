@@ -387,6 +387,7 @@ saved_names, saved_auto = load_sheet_names()
 auto_fetch = saved_auto
 st.sidebar.divider()
 st.sidebar.markdown("### 📋 Manual Sheet Names")
+st.sidebar.markdown("_This list will be used when auto-fetch is OFF._")
 if "sheet_names" not in st.session_state:
     st.session_state.sheet_names = saved_names if saved_names else ["Gopinathji Grp", "Gopinathji Grp Leads 2"]
 to_delete = None
@@ -397,10 +398,11 @@ for i, name in enumerate(st.session_state.sheet_names):
             label_visibility="collapsed", placeholder="Spreadsheet name...")
         st.session_state.sheet_names[i] = new_val
     with col_b:
-        if st.button("🗑️", key=f"del_{i}", help="Delete"):
+        if st.button("🗑️", key=f"del_{name}_{i}", help="Delete"):
             to_delete = i
 if to_delete is not None:
     st.session_state.sheet_names.pop(to_delete)
+    st.session_state.sheet_names = [n for n in st.session_state.sheet_names]
     st.rerun()
 if st.sidebar.button("➕ Add Sheet", use_container_width=True):
     st.session_state.sheet_names.append("")
@@ -483,29 +485,36 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
             all_display = pd.concat(list(project_dfs.values()), ignore_index=True) if project_dfs else pd.DataFrame()
             st.success(f"✅ {len(all_display)} leads found for {date_label}")
 
-
-
-            zip_buffer = io.BytesIO()
-            final_save_dir = None
-
+            # દરેક spreadsheet ના leads અલગ અલગ generate કરો
             try:
                 month_folder = target_date.strftime('%B_%Y')
                 final_save_dir = os.path.join(save_folder, month_folder, date_label)
                 os.makedirs(final_save_dir, exist_ok=True)
+            except:
+                final_save_dir = None
 
-                with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
-                    for project_name, sdf in project_dfs.items():
+            # Sheet-wise PDF generate અને individual download button
+            for sname in found_spreadsheets:
+                sheet_projects = {k: v for k, v in project_dfs.items()
+                                  if filtered[filtered['_spreadsheet'] == sname]['Project'].isin([k]).any()}
+                if not sheet_projects:
+                    continue
+
+                sheet_total = sum(len(v) for v in sheet_projects.values())
+                st.markdown(f"### 📊 {sname} — {sheet_total} leads")
+
+                sheet_zip = io.BytesIO()
+                with zipfile.ZipFile(sheet_zip, "a", zipfile.ZIP_DEFLATED, False) as zf:
+                    for project_name, sdf in sheet_projects.items():
                         try:
                             pdf_df = sdf.drop(columns=['Project'], errors='ignore').copy()
                             non_empty_cols = [col for col in pdf_df.columns
                                               if pdf_df[col].replace('', pd.NA).notna().any()]
                             pdf_df = pdf_df[non_empty_cols]
-
                             priority_cols = ['full_name', 'phone']
                             other_cols = [col for col in pdf_df.columns if col not in priority_cols]
                             existing_priority = [col for col in priority_cols if col in pdf_df.columns]
                             pdf_df = pdf_df[other_cols + existing_priority]
-
                             pdf_bytes = generate_pdf(pdf_df, date_label, project_name)
                         except Exception as pdf_err:
                             st.warning(f"PDF error {project_name}: {pdf_err}")
@@ -513,26 +522,29 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
                         if pdf_bytes and len(pdf_bytes) > 100:
                             safe_name = project_name.replace(' ', '-')
                             fname = f"{safe_name}-({date_label})_{len(sdf)}leads.pdf"
-                            file_path = os.path.join(final_save_dir, fname)
-                            with open(file_path, 'wb') as f:
-                                f.write(pdf_bytes)
-                            zip_file.writestr(fname, pdf_bytes)
+                            if final_save_dir:
+                                try:
+                                    with open(os.path.join(final_save_dir, fname), 'wb') as f:
+                                        f.write(pdf_bytes)
+                                except:
+                                    pass
+                            zf.writestr(fname, pdf_bytes)
 
+                safe_sname = sname.replace(' ', '-')
                 st.download_button(
-                    label="📥 Download All Reports as ZIP",
-                    data=zip_buffer.getvalue(),
-                    file_name=f"Enacle_Leads_{date_label}.zip",
+                    label=f"📥 Download {sname} Report",
+                    data=sheet_zip.getvalue(),
+                    file_name=f"{safe_sname}-{date_label}.zip",
                     mime="application/zip",
-                    use_container_width=True
+                    use_container_width=True,
+                    key=f"dl_{safe_sname}"
                 )
 
+            if final_save_dir:
                 try:
                     os.startfile(final_save_dir)
                 except:
                     pass
-
-            except Exception as ex:
-                st.error(f"Error during saving process: {ex}")
 
         except Exception as e:
             st.error(f"Error: {e}")
