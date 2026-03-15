@@ -163,7 +163,7 @@ def generate_pdf(df, report_date, title="Leads Report"):
         fontName=font_name,
         fontSize=10,
         alignment=1,
-        leading=9,
+        leading=13,
         textColor=colors.white
     )
     cell_style = ParagraphStyle(
@@ -229,8 +229,10 @@ def generate_pdf(df, report_date, title="Leads Report"):
             ('FONTNAME',      (0, 0), (-1, -1), font_name),
             ('FONTSIZE',      (0, 0), (-1, 0),  10),
             ('FONTSIZE',      (0, 1), (-1, -1), 9),
-            ('TOPPADDING',    (0, 0), (-1, -1), 4),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            ('TOPPADDING',    (0, 0), (-1, 0),  8),
+            ('BOTTOMPADDING', (0, 0), (-1, 0),  8),
+            ('TOPPADDING',    (0, 1), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 1), (-1, -1), 4),
             ('LEFTPADDING',   (0, 0), (-1, -1), 3),
             ('RIGHTPADDING',  (0, 0), (-1, -1), 3),
             # Alternating rows
