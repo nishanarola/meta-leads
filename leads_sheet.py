@@ -290,14 +290,20 @@ def clean_cell_value(val):
         return ''
     s = str(val).strip()
     s = normalize_unicode(s)
+    # pure placeholder values
     if s in ('nan', 'None', 'NaT', 'none', 'NaN', '_', "'_'", "'-'", '-', 'false', 'FALSE', 'null', 'NULL'):
         return ''
     if re.match(r"^[\'\"]?[-_]+[\'\"]?$", s):
         return ''
-    s = re.sub(r'^(\d+)_+$', r'\1', s)
+    # test/dummy rows mark
     if s.lower().startswith('<test lead') or 'dummy data' in s.lower():
         return '__TEST_ROW__'
-    return s
+    # trailing underscores remove: "3_" → "3"
+    s = re.sub(r'_+$', '', s)
+    # middle underscores → space: "3_BHK" → "3 BHK", "full_name" → "full name"
+    s = re.sub(r'_+', ' ', s)
+    return s.strip()
+
 
 def clean_col_name(col):
     return str(col).replace('_', ' ').strip()
