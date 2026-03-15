@@ -171,7 +171,7 @@ def generate_pdf(df, report_date, title="Leads Report"):
         fontName=font_name,
         fontSize=9,
         alignment=1,
-        leading=9,
+        leading=12,
         textColor=colors.HexColor('#222222')
     )
 
@@ -231,8 +231,8 @@ def generate_pdf(df, report_date, title="Leads Report"):
             ('FONTSIZE',      (0, 1), (-1, -1), 9),
             ('TOPPADDING',    (0, 0), (-1, 0),  8),
             ('BOTTOMPADDING', (0, 0), (-1, 0),  8),
-            ('TOPPADDING',    (0, 1), (-1, -1), 4),
-            ('BOTTOMPADDING', (0, 1), (-1, -1), 4),
+            ('TOPPADDING',    (0, 1), (-1, -1), 7),
+            ('BOTTOMPADDING', (0, 1), (-1, -1), 7),
             ('LEFTPADDING',   (0, 0), (-1, -1), 3),
             ('RIGHTPADDING',  (0, 0), (-1, -1), 3),
             # Alternating rows
