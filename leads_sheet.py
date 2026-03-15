@@ -454,9 +454,6 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
                     if not sheet_projects:
                         continue
 
-                    sheet_total = sum(len(v) for v in sheet_projects.values())
-                    st.markdown(f"### 📊 {sname} — {sheet_total} leads")
-
                     for project_name, sdf in sheet_projects.items():
                         try:
                             pdf_df = sdf.drop(columns=['Project'], errors='ignore').copy()
@@ -482,15 +479,9 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
                                     pass
                             zf.writestr(fname, pdf_bytes)
 
-            # એક જ Download button — બધી sheets
-            st.download_button(
-                label=f"📥 Download All Reports ({date_label})",
-                data=master_zip.getvalue(),
-                file_name=f"All-Reports-{date_label}.zip",
-                mime="application/zip",
-                use_container_width=True,
-                key="dl_all"
-            )
+            # ZIP ને session_state માં store કરો — download button rerun avoid કરે
+            st.session_state["master_zip"] = master_zip.getvalue()
+            st.session_state["zip_date_label"] = date_label
 
             if final_save_dir:
                 try:
@@ -501,3 +492,15 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
         except Exception as e:
             st.error(f"Error: {e}")
             st.exception(e)
+
+# Download button — session_state માંથી show કરો, generate button સાથે tied નહીં
+if "master_zip" in st.session_state:
+    date_label_dl = st.session_state.get("zip_date_label", "")
+    st.download_button(
+        label=f"📥 Download All Reports ({date_label_dl})",
+        data=st.session_state["master_zip"],
+        file_name=f"All-Reports-{date_label_dl}.zip",
+        mime="application/zip",
+        use_container_width=True,
+        key="dl_all"
+    )
