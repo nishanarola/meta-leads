@@ -127,6 +127,8 @@ def generate_pdf(df, report_date, title="Leads Report"):
                 val = str(df.iloc[row_idx][col]).replace('_', ' ').strip()
                 if val in ('nan', 'None', 'NaT', 'none'):
                     val = ''
+                # Gujarati characters encode કરો
+                val = val.encode('latin-1', errors='replace').decode('latin-1')
                 x = pdf.l_margin + sum(col_widths[:i])
                 chars_per_line = max(1, int(col_widths[i] / 2.2))
                 num_lines = max(1, -(-len(val) // chars_per_line))
