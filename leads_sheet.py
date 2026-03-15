@@ -59,24 +59,21 @@ FONT_AVAILABLE = download_font()
 def generate_pdf(df, report_date, title="Leads Report"):
     pdf = FPDF(orientation='L', unit='mm', format='A4')
     pdf.add_page()
-
+    
     if FONT_AVAILABLE:
+        # fpdf2 માં 'uni=True' ની જરૂર નથી, તે ઓટોમેટિક હોય છે
         pdf.add_font("MainFont", "", FONT_PATH)
         font_name = "MainFont"
     else:
         font_name = "Arial"
-
+        font_name = "Arial"
     page_width = 277
-
-    # Title
     pdf.set_font(font_name, size=18)
     pdf.cell(0, 8, str(title), ln=True, align='C')
     pdf.set_font(font_name, size=14)
     pdf.cell(0, 6, f"Date: {report_date}  |  Total Leads: {len(df)}", ln=True, align='C')
     pdf.ln(4)
-
     if not df.empty:
-        # Column widths
         col_widths = []
         for col in df.columns:
             c = col.lower()
@@ -88,53 +85,62 @@ def generate_pdf(df, report_date, title="Leads Report"):
             elif not col.isascii(): col_widths.append(40)
             else: col_widths.append(25)
         col_widths = [w * page_width / sum(col_widths) for w in col_widths]
+        header_height = 15
+        start_y = pdf.get_y()
 
-        header_height = 8
-        pdf.set_font(font_name, size=8)
-
-        # ── Header ──────────────────────────────────────────────
+        # Header
         for i, col in enumerate(df.columns):
+            x = pdf.get_x()
+            y = start_y
             pdf.set_fill_color(52, 73, 94)
+            pdf.rect(x, y, col_widths[i], header_height, 'FD')
             pdf.set_text_color(255, 255, 255)
-            pdf.cell(col_widths[i], header_height, str(col), border=1, align='C', fill=True)
-        pdf.ln()
+            pdf.set_font(font_name, size=8)
+            pdf.set_xy(x, y + 3)
+            pdf.multi_cell(col_widths[i], 4, str(col), 0, 'C')
+            pdf.set_xy(x + col_widths[i], start_y)
 
-        # ── Rows ────────────────────────────────────────────────
+        pdf.set_xy(pdf.l_margin, start_y + header_height)
         pdf.set_text_color(0, 0, 0)
-        pdf.set_font(font_name, size=8)
-        line_height = 6
 
+        # Rows
+        line_height = 5.5
         for row_idx in range(len(df)):
-            if pdf.get_y() + line_height > pdf.page_break_trigger:
+            if pdf.get_y() + 20 > pdf.page_break_trigger:
                 pdf.add_page()
                 pdf.set_font(font_name, size=8)
-                # Re-draw header on new page
-                for i, col in enumerate(df.columns):
-                    pdf.set_fill_color(52, 73, 94)
-                    pdf.set_text_color(255, 255, 255)
-                    pdf.cell(col_widths[i], header_height, str(col), border=1, align='C', fill=True)
-                pdf.ln()
-                pdf.set_text_color(0, 0, 0)
 
-            if row_idx % 2 == 0:
-                pdf.set_fill_color(245, 245, 245)
-            else:
-                pdf.set_fill_color(255, 255, 255)
+            pdf.set_fill_color(245, 245, 245) if row_idx % 2 == 0 else pdf.set_fill_color(255, 255, 255)
+            pdf.set_font(font_name, size=8)
+            row_y = pdf.get_y()
+
+            max_lines = 1
+            for i, col in enumerate(df.columns):
+                val = str(df.iloc[row_idx][col])
+                chars_per_line = max(1, int(col_widths[i] / 2.2))
+                lines = max(1, -(-len(val) // chars_per_line))
+                if lines > max_lines:
+                    max_lines = lines
+            row_height = max_lines * line_height
 
             for i, col in enumerate(df.columns):
                 val = str(df.iloc[row_idx][col])
-                # Replace problematic characters
-                val = val.replace('\u2019', "'").replace('\u2018', "'") \
-                         .replace('\u201c', '"').replace('\u201d', '"') \
-                         .replace('\u2013', '-').replace('\u2014', '-')
-                try:
-                    pdf.cell(col_widths[i], line_height, val, border=1, align='C', fill=True)
-                except Exception:
-                    safe = val.encode('latin-1', errors='replace').decode('latin-1')
-                    pdf.cell(col_widths[i], line_height, safe, border=1, align='C', fill=True)
-            pdf.ln()
+                x = pdf.l_margin + sum(col_widths[:i])
+                chars_per_line = max(1, int(col_widths[i] / 2.2))
+                num_lines = max(1, -(-len(val) // chars_per_line))
+                cell_line_h = row_height / num_lines
+                pdf.set_xy(x, row_y)
+                pdf.rect(x, row_y, col_widths[i], row_height, 'FD')
+                # rect પછી cursor reset થઈ જાય છે, તેથી ફરીથી set કરો
+                text_y = row_y + (row_height - cell_line_h) / 2
+                pdf.set_xy(x, text_y)
+                pdf.multi_cell(col_widths[i], cell_line_h, val, border=0, align='C', new_x="RIGHT", new_y="TOP")
+                pdf.set_xy(x + col_widths[i], row_y)
+
+            pdf.set_xy(pdf.l_margin, row_y + row_height)
 
     return pdf.output()
+
 def parse_to_ist(series):
     results = []
     ist_tz = pytz.timezone('Asia/Kolkata')
