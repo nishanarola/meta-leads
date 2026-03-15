@@ -445,17 +445,18 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
             except:
                 final_save_dir = None
 
-            for sname in found_spreadsheets:
-                sheet_projects = {k: v for k, v in project_dfs.items()
-                                  if filtered[filtered['_spreadsheet'] == sname]['Project'].isin([k]).any()}
-                if not sheet_projects:
-                    continue
+            # બધી sheets ના PDFs એક જ ZIP માં
+            master_zip = io.BytesIO()
+            with zipfile.ZipFile(master_zip, "a", zipfile.ZIP_DEFLATED, False) as zf:
+                for sname in found_spreadsheets:
+                    sheet_projects = {k: v for k, v in project_dfs.items()
+                                      if filtered[filtered['_spreadsheet'] == sname]['Project'].isin([k]).any()}
+                    if not sheet_projects:
+                        continue
 
-                sheet_total = sum(len(v) for v in sheet_projects.values())
-                st.markdown(f"### 📊 {sname} — {sheet_total} leads")
+                    sheet_total = sum(len(v) for v in sheet_projects.values())
+                    st.markdown(f"### 📊 {sname} — {sheet_total} leads")
 
-                sheet_zip = io.BytesIO()
-                with zipfile.ZipFile(sheet_zip, "a", zipfile.ZIP_DEFLATED, False) as zf:
                     for project_name, sdf in sheet_projects.items():
                         try:
                             pdf_df = sdf.drop(columns=['Project'], errors='ignore').copy()
@@ -481,15 +482,15 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
                                     pass
                             zf.writestr(fname, pdf_bytes)
 
-                safe_sname = sname.replace(' ', '-')
-                st.download_button(
-                    label=f"📥 Download {sname} Report",
-                    data=sheet_zip.getvalue(),
-                    file_name=f"{safe_sname}-{date_label}.zip",
-                    mime="application/zip",
-                    use_container_width=True,
-                    key=f"dl_{safe_sname}"
-                )
+            # એક જ Download button — બધી sheets
+            st.download_button(
+                label=f"📥 Download All Reports ({date_label})",
+                data=master_zip.getvalue(),
+                file_name=f"All-Reports-{date_label}.zip",
+                mime="application/zip",
+                use_container_width=True,
+                key="dl_all"
+            )
 
             if final_save_dir:
                 try:
