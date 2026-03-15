@@ -431,7 +431,7 @@ sheet_names_list, auto_fetch_active = load_sheet_names()
 
 st.markdown("""
     <style>
-        .st-emotion-cache-3pwa5w { display: none; }
+    
         section[data-testid="stSidebar"] .stButton > button {
             background-color: hsl(217, 91%, 60%) !important;
             border-color: hsl(217, 91%, 60%) !important;
