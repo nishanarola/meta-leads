@@ -292,7 +292,7 @@ sheet_names_list, auto_fetch_active = load_sheet_names()
 st.markdown("""
     <style>
             font-family: 'Noto Sans Gujarati', sans-serif;
-          .st-emotion-cache-3pwa5w { display: none !important;}
+          .st-emotion-cache-6c7yup eqmt79k2 { display: none !important;}
            section[data-testid="stSidebar"] .stButton > button {
     background-color: hsl(217, 91%, 60%) !important;
     border-color: hsl(217, 91%, 60%) !important;
