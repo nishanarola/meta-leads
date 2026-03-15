@@ -385,7 +385,6 @@ saved_names, saved_auto = load_sheet_names()
 auto_fetch = saved_auto
 st.sidebar.divider()
 st.sidebar.markdown("### 📋 Manual Sheet Names")
-st.sidebar.markdown("_This list will be used when auto-fetch is OFF._")
 if "sheet_names" not in st.session_state:
     st.session_state.sheet_names = saved_names if saved_names else ["Gopinathji Grp", "Gopinathji Grp Leads 2"]
 to_delete = None
