@@ -59,9 +59,25 @@ FONT_AVAILABLE = download_font()
 def generate_pdf(df, report_date, title="Leads Report"):
     pdf = FPDF(orientation='L', unit='mm', format='A4')
     pdf.add_page()
-    font_name = "MainFont" if FONT_AVAILABLE else "Arial"
-    if FONT_AVAILABLE:
+    
+    DEJAVU_PATH = "DejaVuSans.ttf"
+    if not os.path.exists(DEJAVU_PATH):
+        try:
+            r = requests.get("https://github.com/dejavu-fonts/dejavu-fonts/raw/master/ttf/DejaVuSans.ttf", timeout=10)
+            if r.status_code == 200:
+                with open(DEJAVU_PATH, "wb") as f:
+                    f.write(r.content)
+        except:
+            pass
+    
+    if os.path.exists(DEJAVU_PATH):
+        pdf.add_font("MainFont", "", DEJAVU_PATH, uni=True)
+        font_name = "MainFont"
+    elif FONT_AVAILABLE:
         pdf.add_font("MainFont", "", FONT_PATH, uni=True)
+        font_name = "MainFont"
+    else:
+        font_name = "Arial"
     page_width = 277
     pdf.set_font(font_name, size=18)
     pdf.cell(0, 8, str(title), ln=True, align='C')
@@ -121,7 +137,6 @@ def generate_pdf(df, report_date, title="Leads Report"):
 
             for i, col in enumerate(df.columns):
                 val = str(df.iloc[row_idx][col])
-                val = ''.join(c if ord(c) < 128 or '\u0A80' <= c <= '\u0AFF' else '?' for c in val)
                 x = pdf.l_margin + sum(col_widths[:i])
                 chars_per_line = max(1, int(col_widths[i] / 2.2))
                 num_lines = max(1, -(-len(val) // chars_per_line))
