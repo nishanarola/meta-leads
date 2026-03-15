@@ -54,7 +54,7 @@ def download_font():
         pass
     return False
 
-FONT_AVAILABLE = download_font()
+FONT_AVAILABLE = False  # Force Helvetica
 
 def generate_pdf(df, report_date, title="Leads Report"):
     pdf = FPDF(orientation='L', unit='mm', format='A4')
@@ -66,7 +66,8 @@ def generate_pdf(df, report_date, title="Leads Report"):
         font_name = "MainFont"
     else:
         font_name = "Arial"
-        font_name = "Arial"
+        font_name = "Helvetica"
+
     page_width = 277
     pdf.set_font(font_name, size=18)
     pdf.cell(0, 8, str(title), ln=True, align='C')
