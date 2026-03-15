@@ -350,11 +350,6 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
             all_display = pd.concat(list(project_dfs.values()), ignore_index=True) if project_dfs else pd.DataFrame()
             st.success(f"✅ {len(all_display)} leads found for {date_label}")
 
-            # ✅ દરેક project અલગ table તરીકે show કરો
-            for project_name, pdf_df in project_dfs.items():
-                st.subheader(f"📁 {project_name} — {len(pdf_df)} leads")
-                render_centered_table(pdf_df)
-
             zip_buffer = io.BytesIO()
             final_save_dir = None
 
