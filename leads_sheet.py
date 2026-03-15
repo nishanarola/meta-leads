@@ -117,7 +117,7 @@ def generate_pdf(df, report_date, title="Leads Report"):
             max_lines = 1
             for i, col in enumerate(df.columns):
                 val = str(df.iloc[row_idx][col])
-                chars_per_line = max(1, int(col_widths[i] / 2.5))
+                chars_per_line = max(1, int(col_widths[i] / 2.2))
                 lines = max(1, -(-len(val) // chars_per_line))
                 if lines > max_lines:
                     max_lines = lines
