@@ -54,7 +54,7 @@ def download_font():
         pass
     return False
 
-FONT_AVAILABLE = False  # Force Helvetica
+FONT_AVAILABLE = download_font()
 
 def generate_pdf(df, report_date, title="Leads Report"):
     pdf = FPDF(orientation='L', unit='mm', format='A4')
@@ -65,8 +65,8 @@ def generate_pdf(df, report_date, title="Leads Report"):
         pdf.add_font("MainFont", "", FONT_PATH)
         font_name = "MainFont"
     else:
-        font_name = "Helvetica"
-
+        font_name = "Arial"
+        font_name = "Arial"
     page_width = 277
     pdf.set_font(font_name, size=18)
     pdf.cell(0, 8, str(title), ln=True, align='C')
@@ -124,11 +124,7 @@ def generate_pdf(df, report_date, title="Leads Report"):
             row_height = max_lines * line_height
 
             for i, col in enumerate(df.columns):
-                val = str(df.iloc[row_idx][col]).replace('_', ' ').strip()
-                if val in ('nan', 'None', 'NaT', 'none'):
-                    val = ''
-                # Gujarati characters encode કરો
-                val = val.encode('latin-1', errors='replace').decode('latin-1')
+                val = str(df.iloc[row_idx][col])
                 x = pdf.l_margin + sum(col_widths[:i])
                 chars_per_line = max(1, int(col_widths[i] / 2.2))
                 num_lines = max(1, -(-len(val) // chars_per_line))
@@ -296,7 +292,7 @@ sheet_names_list, auto_fetch_active = load_sheet_names()
 st.markdown("""
     <style>
             font-family: 'Noto Sans Gujarati', sans-serif;
-          .st-emotion-cache-6c7yup eqmt79k2 { display: none !important;}
+          .st-emotion-cache-3pwa5w { display: none !important;}
            section[data-testid="stSidebar"] .stButton > button {
     background-color: hsl(217, 91%, 60%) !important;
     border-color: hsl(217, 91%, 60%) !important;
