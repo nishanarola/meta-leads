@@ -42,7 +42,7 @@ def save_sheet_names(names, auto_fetch):
     with open(SHEETS_CONFIG_FILE, "w") as f:
         json.dump({"sheets": names, "auto_fetch": auto_fetch}, f, indent=2)
 
-FONT_PATH = "NotoSansGujarati.ttf"
+FONT_PATH = "NotoSansGujarati-Regular.ttf"
 
 def download_font():
     if os.path.exists(FONT_PATH) and os.path.getsize(FONT_PATH) > 10000:
