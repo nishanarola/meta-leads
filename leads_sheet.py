@@ -37,15 +37,19 @@ def save_sheet_names(names, auto_fetch):
 
 FONT_PATH = "NotoSansGujarati.ttf"
 
+FONT_PATH = "NotoSansGujarati.ttf"
+
 def download_font():
     if os.path.exists(FONT_PATH) and os.path.getsize(FONT_PATH) > 10000:
         return True
     try:
+        # Static font URLs (variable font fpdf2 સાથે કામ નથી કરતો)
         for url in [
-            "https://github.com/google/fonts/raw/main/ofl/notosansgujarati/NotoSansGujarati%5Bwdth%2Cwght%5D.ttf",
-            "https://fonts.gstatic.com/s/notosansgujarati/v20/6xKhdSpbNNCT-vSSdB8ArxGi3dSQ.ttf",
+            "https://github.com/google/fonts/raw/main/ofl/notosansgujarati/NotoSansGujarati-Regular.ttf",
+            "https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSansGujarati/NotoSansGujarati-Regular.ttf",
+            "https://raw.githubusercontent.com/google/fonts/main/ofl/notosansgujarati/NotoSansGujarati-Regular.ttf",
         ]:
-            r = requests.get(url, timeout=10)
+            r = requests.get(url, timeout=15)
             if r.status_code == 200 and len(r.content) > 10000:
                 with open(FONT_PATH, "wb") as f:
                     f.write(r.content)
