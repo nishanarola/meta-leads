@@ -285,18 +285,23 @@ def parse_to_ist(series):
     return pd.Series(results, index=series.index)
 
 def clean_cell_value(val):
-    """Individual cell value clean કરો"""
+    """Individual cell value clean"""
     if pd.isna(val):
         return ''
     s = str(val).strip()
-    # normalize bold/fancy unicode
     s = normalize_unicode(s)
-    # placeholder values
     if s in ('nan', 'None', 'NaT', 'none', 'NaN', '_', "'_'", "'-'", '-', 'false', 'FALSE', 'null', 'NULL'):
         return ''
-    if re.match(r"^['\"]?[-_]+['\"]?$", s):
+    if re.match(r"^[\'\"]?[-_]+[\'\"]?$", s):
         return ''
+    s = re.sub(r'^(\d+)_+$', r'\1', s)
+    if s.lower().startswith('<test lead') or 'dummy data' in s.lower():
+        return '__TEST_ROW__'
     return s
+
+def clean_col_name(col):
+    return str(col).replace('_', ' ').strip()
+
 
 
 def load_all_sheets(sheet_names_list, auto_fetch_all):
@@ -337,6 +342,9 @@ def load_all_sheets(sheet_names_list, auto_fetch_all):
                 for col in df.columns:
                     df[col] = df[col].apply(lambda x: clean_cell_value(x) if pd.notna(x) else x)
                     df[col] = df[col].replace('', pd.NA)
+                # Test/dummy rows filter કરો
+                mask = df.apply(lambda row: row.astype(str).str.contains('__TEST_ROW__').any(), axis=1)
+                df = df[~mask].reset_index(drop=True)
                 if 'created_time' not in df.columns:
                     continue
                 df['created_dt'] = parse_to_ist(df['created_time'])
@@ -431,7 +439,9 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 def render_centered_table(df):
-    html = df.to_html(index=False, classes="leads-table", border=0, escape=False)
+    display_df = df.copy()
+    display_df.columns = [clean_col_name(c) for c in display_df.columns]
+    html = display_df.to_html(index=False, classes="leads-table", border=0, escape=False)
     st.markdown(html, unsafe_allow_html=True)
 
 if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
