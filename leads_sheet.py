@@ -131,11 +131,8 @@ def generate_pdf(df, report_date, title="Leads Report"):
                 cell_line_h = row_height / num_lines
                 pdf.set_xy(x, row_y)
                 pdf.rect(x, row_y, col_widths[i], row_height, 'FD')
-                # rect પછી cursor reset થઈ જાય છે, તેથી ફરીથી set કરો
-                text_y = row_y + (row_height - cell_line_h) / 2
-                pdf.set_xy(x, text_y)
-                pdf.multi_cell(col_widths[i], cell_line_h, val, border=0, align='C', new_x="RIGHT", new_y="TOP")
-                pdf.set_xy(x + col_widths[i], row_y)
+                pdf.set_xy(x, row_y)
+                pdf.multi_cell(col_widths[i], cell_line_h, val, 0, 'C')
 
             pdf.set_xy(pdf.l_margin, row_y + row_height)
 
