@@ -1,13 +1,6 @@
 import streamlit as st
 import pandas as pd
 from fpdf import FPDF
-from reportlab.lib.pagesizes import A4, landscape
-from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.lib.units import mm
 from datetime import datetime, timedelta
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
@@ -67,30 +60,18 @@ def generate_pdf(df, report_date, title="Leads Report"):
     pdf = FPDF(orientation='L', unit='mm', format='A4')
     pdf.add_page()
     
-    DEJAVU_PATH = "DejaVuSans.ttf"
-    if not os.path.exists(DEJAVU_PATH):
-        try:
-            r = requests.get(
-                "https://github.com/dejavu-fonts/dejavu-fonts/releases/download/version_2_37/dejavu-fonts-ttf-2.37.tar.bz2",
-                timeout=15
-            )
-        except:
-            pass
-    
-    # DejaVu ને બદલે સીધું Noto Sans Gujarati વાપરો
     if FONT_AVAILABLE:
-        pdf.add_font("MainFont", "", FONT_PATH, uni=True)
-        font_name = "MainFont"
-    elif os.path.exists(DEJAVU_PATH):
+        # fpdf2 માં 'uni=True' ની જરૂર નથી, તે ઓટોમેટિક હોય છે
         pdf.add_font("MainFont", "", FONT_PATH)
         font_name = "MainFont"
     else:
         font_name = "Arial"
-
+        font_name = "Arial"
     page_width = 277
     pdf.set_font(font_name, size=18)
     pdf.cell(0, 8, str(title), ln=True, align='C')
     pdf.set_font(font_name, size=14)
+    pdf.cell(0, 6, f"Date: {report_date}  |  Total Leads: {len(df)}", ln=True, align='C')
     pdf.ln(4)
     if not df.empty:
         col_widths = []
@@ -136,7 +117,6 @@ def generate_pdf(df, report_date, title="Leads Report"):
             max_lines = 1
             for i, col in enumerate(df.columns):
                 val = str(df.iloc[row_idx][col])
-                val = ''.join(c if ord(c) < 128 or '\u0A80' <= c <= '\u0AFF' else '?' for c in val)
                 chars_per_line = max(1, int(col_widths[i] / 2.2))
                 lines = max(1, -(-len(val) // chars_per_line))
                 if lines > max_lines:
