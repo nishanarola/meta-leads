@@ -47,15 +47,20 @@ def download_font():
     if os.path.exists(FONT_PATH) and os.path.getsize(FONT_PATH) > 10000:
         return True
     try:
-        for url in [
+        urls = [
             "https://github.com/google/fonts/raw/main/ofl/notosansgujarati/NotoSansGujarati-Regular.ttf",
             "https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSansGujarati/NotoSansGujarati-Regular.ttf",
-        ]:
-            r = requests.get(url, timeout=15)
-            if r.status_code == 200 and len(r.content) > 10000:
-                with open(FONT_PATH, "wb") as f:
-                    f.write(r.content)
-                return True
+            "https://raw.githubusercontent.com/google/fonts/main/ofl/notosansgujarati/NotoSansGujarati-Regular.ttf",
+        ]
+        for url in urls:
+            try:
+                r = requests.get(url, timeout=20, headers={"User-Agent": "Mozilla/5.0"})
+                if r.status_code == 200 and len(r.content) > 10000:
+                    with open(FONT_PATH, "wb") as f:
+                        f.write(r.content)
+                    return True
+            except:
+                continue
     except:
         pass
     return False
@@ -68,7 +73,11 @@ def clean_html(text):
     text = re.sub(r'<[^>]+>', '', text)   # HTML tags remove
     text = text.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>').replace('&nbsp;', ' ')
     text = text.strip()
-    if text in ('nan', 'None', 'NaT', 'none', 'NaN'):
+    # Empty/placeholder values
+    if text in ('nan', 'None', 'NaT', 'none', 'NaN', '_', "'_'", "'-'", '-', "''", '""'):
+        return ''
+    # Single quotes around underscore or dash — Google Sheets placeholder
+    if re.match(r"^['\"]?[-_]+['\"]?$", text):
         return ''
     return text
 
@@ -134,7 +143,7 @@ def generate_pdf(df, report_date, title="Leads Report"):
 
     elements = []
     elements.append(Paragraph(clean_html(title), title_style))
-    elements.append(Paragraph(f"Date: {report_date}  |  Total Leads: {len(df)}", subtitle_style))
+    elements.append(Paragraph(f"Date: {report_date}   |   Total Leads: {len(df)}", subtitle_style))
     elements.append(Spacer(1, 3*mm))
 
     if not df.empty:
