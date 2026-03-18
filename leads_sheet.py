@@ -22,6 +22,26 @@ import re
 
 load_dotenv()
 
+# ── FIX 1: Hindi text shaping ─────────────────────────────────────────────────
+# pip install python-bidi
+try:
+    from bidi.algorithm import get_display as bidi_get_display
+    BIDI_AVAILABLE = True
+except ImportError:
+    BIDI_AVAILABLE = False
+
+import unicodedata as _ud
+
+def shape_indic_text(text):
+    """NFC normalize + bidi passthrough — fixes Hindi/Gujarati rendering in ReportLab."""
+    if not text:
+        return text
+    text = _ud.normalize('NFC', str(text))  # NFC critical for Devanagari conjuncts
+    if BIDI_AVAILABLE:
+        text = bidi_get_display(text)
+    return text
+# ─────────────────────────────────────────────────────────────────────────────
+
 st.set_page_config(page_title="Enacle", page_icon="🏠", layout="wide")
 st.title("Enacle — Leads Report")
 
@@ -42,30 +62,95 @@ def save_sheet_names(names, auto_fetch):
         json.dump({"sheets": names, "auto_fetch": auto_fetch}, f, indent=2)
 
 FONT_PATH = "NotoSansGujarati-Regular.ttf"
+# FIX 1: Devanagari (Hindi) font path
+DEVANAGARI_FONT_PATH = "NotoSansDevanagari-Regular.ttf"
 
 def download_font():
+    # Original Gujarati font download — unchanged
     if os.path.exists(FONT_PATH) and os.path.getsize(FONT_PATH) > 10000:
-        return True
-    try:
-        urls = [
-            "https://github.com/google/fonts/raw/main/ofl/notosansgujarati/NotoSansGujarati-Regular.ttf",
-            "https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSansGujarati/NotoSansGujarati-Regular.ttf",
-            "https://raw.githubusercontent.com/google/fonts/main/ofl/notosansgujarati/NotoSansGujarati-Regular.ttf",
-        ]
-        for url in urls:
-            try:
-                r = requests.get(url, timeout=20, headers={"User-Agent": "Mozilla/5.0"})
-                if r.status_code == 200 and len(r.content) > 10000:
-                    with open(FONT_PATH, "wb") as f:
-                        f.write(r.content)
-                    return True
-            except:
-                continue
-    except:
-        pass
-    return False
+        gujarati_ok = True
+    else:
+        gujarati_ok = False
+        try:
+            urls = [
+                "https://github.com/google/fonts/raw/main/ofl/notosansgujarati/NotoSansGujarati-Regular.ttf",
+                "https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSansGujarati/NotoSansGujarati-Regular.ttf",
+                "https://raw.githubusercontent.com/google/fonts/main/ofl/notosansgujarati/NotoSansGujarati-Regular.ttf",
+            ]
+            for url in urls:
+                try:
+                    r = requests.get(url, timeout=20, headers={"User-Agent": "Mozilla/5.0"})
+                    if r.status_code == 200 and len(r.content) > 10000:
+                        with open(FONT_PATH, "wb") as f:
+                            f.write(r.content)
+                        gujarati_ok = True
+                        break
+                except:
+                    continue
+        except:
+            pass
+
+    # FIX 1: Download Devanagari font for Hindi
+    if os.path.exists(DEVANAGARI_FONT_PATH) and os.path.getsize(DEVANAGARI_FONT_PATH) > 10000:
+        devanagari_ok = True
+    else:
+        devanagari_ok = False
+        try:
+            dev_urls = [
+                "https://github.com/google/fonts/raw/main/ofl/notosansdevanagari/NotoSansDevanagari-Regular.ttf",
+                "https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSansDevanagari/NotoSansDevanagari-Regular.ttf",
+                "https://raw.githubusercontent.com/google/fonts/main/ofl/notosansdevanagari/NotoSansDevanagari-Regular.ttf",
+            ]
+            for url in dev_urls:
+                try:
+                    r = requests.get(url, timeout=20, headers={"User-Agent": "Mozilla/5.0"})
+                    if r.status_code == 200 and len(r.content) > 10000:
+                        with open(DEVANAGARI_FONT_PATH, "wb") as f:
+                            f.write(r.content)
+                        devanagari_ok = True
+                        break
+                except:
+                    continue
+        except:
+            pass
+
+    return gujarati_ok or devanagari_ok
 
 FONT_AVAILABLE = download_font()
+
+# FIX 1: Register both fonts and pick best one based on script detection
+def _register_fonts_and_get_name():
+    """Register Devanagari + Gujarati fonts, return best available font name."""
+    font_name = "Helvetica"
+    if os.path.exists(DEVANAGARI_FONT_PATH):
+        try:
+            pdfmetrics.registerFont(TTFont("DevanagariFont", DEVANAGARI_FONT_PATH))
+            font_name = "DevanagariFont"  # prefer Devanagari as it covers Hindi + Latin
+        except:
+            pass
+    if os.path.exists(FONT_PATH):
+        try:
+            pdfmetrics.registerFont(TTFont("GujaratiFont", FONT_PATH))
+            if font_name == "Helvetica":
+                font_name = "GujaratiFont"
+        except:
+            pass
+    return font_name
+
+def _get_cell_font(text):
+    """FIX 1: Per-cell font detection for Hindi vs Gujarati vs Latin."""
+    s = str(text)
+    has_dev = any('\u0900' <= c <= '\u097F' for c in s)
+    has_guj = any('\u0A80' <= c <= '\u0AFF' for c in s)
+    if has_dev and os.path.exists(DEVANAGARI_FONT_PATH):
+        return "DevanagariFont"
+    if has_guj and os.path.exists(FONT_PATH):
+        return "GujaratiFont"
+    if os.path.exists(DEVANAGARI_FONT_PATH):
+        return "DevanagariFont"
+    if os.path.exists(FONT_PATH):
+        return "GujaratiFont"
+    return "Helvetica"
 
 def normalize_unicode(text):
     import unicodedata
@@ -101,6 +186,8 @@ def clean_html(text):
         return ''
     if re.match(r"^['\"]?[-_]+['\"]?$", text):
         return ''
+    # FIX 1: Apply Indic shaping so ReportLab renders Hindi correctly
+    text = shape_indic_text(text)
     return text
 
 def clean_col_name(col):
@@ -111,13 +198,10 @@ def clean_col_name(col):
 def generate_pdf(df, report_date, title="Leads Report"):
     buffer = io.BytesIO()
 
+    # FIX 1: Use new font registration helper
     font_name = "Helvetica"
-    if FONT_AVAILABLE and os.path.exists(FONT_PATH):
-        try:
-            pdfmetrics.registerFont(TTFont("GujaratiFont", FONT_PATH))
-            font_name = "GujaratiFont"
-        except:
-            font_name = "Helvetica"
+    if FONT_AVAILABLE:
+        font_name = _register_fonts_and_get_name()
 
     doc = SimpleDocTemplate(
         buffer,
@@ -143,7 +227,21 @@ def generate_pdf(df, report_date, title="Leads Report"):
         header_row = [Paragraph(c, header_style) for c in clean_cols]
         data_rows = []
         for _, row in df.iterrows():
-            data_rows.append([Paragraph(clean_html(v), cell_style) for v in row])
+            cells = []
+            for v in row:
+                cell_text = clean_html(v)
+                # FIX 1: Per-cell font so Hindi cells use DevanagariFont automatically
+                cell_font = _get_cell_font(cell_text)
+                if cell_font != font_name:
+                    per_cell_style = ParagraphStyle(
+                        f'Cell_{cell_font}', fontName=cell_font,
+                        fontSize=9, alignment=1, leading=12,
+                        textColor=colors.HexColor('#222222')
+                    )
+                    cells.append(Paragraph(cell_text, per_cell_style))
+                else:
+                    cells.append(Paragraph(cell_text, cell_style))
+            data_rows.append(cells)
 
         table_data = [header_row] + data_rows
         page_w = landscape(A4)[0] - 16*mm
@@ -190,6 +288,28 @@ def generate_pdf(df, report_date, title="Leads Report"):
     return buffer.getvalue()
 
 
+# FIX 2: Multi-format date parser — original parse_to_ist logic unchanged,
+# sirf _try_formats() helper add karyu che jo explicit formats try kare che
+_DATE_FMTS = [
+    '%Y-%m-%dT%H:%M:%S.%f', '%Y-%m-%dT%H:%M:%S',
+    '%Y-%m-%d %H:%M:%S.%f', '%Y-%m-%d %H:%M:%S',
+    '%Y-%m-%d',
+    '%d-%m-%Y %H:%M:%S',    '%d-%m-%Y',
+    '%d/%m/%Y %H:%M:%S',    '%d/%m/%Y',
+    '%m/%d/%Y %H:%M:%S',    '%m/%d/%Y',
+    '%d %b %Y',             '%d %B %Y',
+    '%b %d, %Y',            '%B %d, %Y',
+]
+
+def _try_formats(s):
+    """Try explicit date formats before falling back to dateutil."""
+    for fmt in _DATE_FMTS:
+        try:
+            return pd.Timestamp(datetime.strptime(s.strip(), fmt))
+        except:
+            continue
+    return None
+
 def parse_to_ist(series):
     results = []
     ist_tz = pytz.timezone('Asia/Kolkata')
@@ -200,13 +320,18 @@ def parse_to_ist(series):
             if not s or s in ('nan', 'None', 'NaT'):
                 results.append(pd.NaT)
                 continue
-            try:
-                dt = dtparser.parse(s)
-                if dt.tzinfo is not None:
-                    dt = dt.astimezone(ist_tz).replace(tzinfo=None)
-                parsed = pd.Timestamp(dt)
-            except:
-                pass
+            # FIX 2: Try explicit formats first (prevents silent parse failures)
+            explicit = _try_formats(s)
+            if explicit is not None:
+                parsed = explicit
+            if pd.isnull(parsed):
+                try:
+                    dt = dtparser.parse(s)
+                    if dt.tzinfo is not None:
+                        dt = dt.astimezone(ist_tz).replace(tzinfo=None)
+                    parsed = pd.Timestamp(dt)
+                except:
+                    pass
             if pd.isnull(parsed):
                 try:
                     ts = pd.to_datetime(s, utc=True)
@@ -321,8 +446,6 @@ st.sidebar.markdown("### 📋 Manual Sheet Names")
 if "sheet_names" not in st.session_state:
     st.session_state.sheet_names = saved_names if saved_names else ["Gopinathji Grp"]
 
-# Unique ID based approach — index problem avoid કરો
-# દરેક sheet ને unique id આપો
 if "sheet_ids" not in st.session_state or len(st.session_state.sheet_ids) != len(st.session_state.sheet_names):
     import uuid
     st.session_state.sheet_ids = [str(uuid.uuid4())[:8] for _ in st.session_state.sheet_names]
@@ -330,7 +453,6 @@ if "sheet_ids" not in st.session_state or len(st.session_state.sheet_ids) != len
 delete_id = None
 for uid, name in zip(st.session_state.sheet_ids, st.session_state.sheet_names):
     cols = st.sidebar.columns([5, 1])
-    # key = uid based — unique per sheet, not index based
     new_val = cols[0].text_input(
         uid,
         value=name,
@@ -338,7 +460,6 @@ for uid, name in zip(st.session_state.sheet_ids, st.session_state.sheet_names):
         placeholder="Spreadsheet name...",
         key=f"sheet_{uid}"
     )
-    # directly update name as user types
     idx = st.session_state.sheet_ids.index(uid)
     st.session_state.sheet_names[idx] = new_val
     if cols[1].button("🗑️", key=f"del_{uid}"):
@@ -416,7 +537,12 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
             if filtered.empty:
                 filtered = df[df['created_time'] == date_label].copy()
             if filtered.empty:
-                st.error(f"❌ No Leads Found for {date_label}.")
+                # FIX 2: Show sample dates to help debug missing leads
+                sample_dates = df['created_time'].dropna().unique()[:8].tolist()
+                st.error(
+                    f"❌ No Leads Found for {date_label}.\n\n"
+                    f"Sample dates found in sheets: `{sample_dates}`"
+                )
                 st.stop()
 
             found_spreadsheets = filtered['_spreadsheet'].unique().tolist()
@@ -444,7 +570,6 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
             except:
                 final_save_dir = None
 
-            # બધી sheets ના PDFs એક જ ZIP માં
             master_zip = io.BytesIO()
             with zipfile.ZipFile(master_zip, "a", zipfile.ZIP_DEFLATED, False) as zf:
                 for sname in found_spreadsheets:
@@ -469,7 +594,9 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
                             continue
                         if pdf_bytes and len(pdf_bytes) > 100:
                             safe_name = project_name.replace(' ', '-')
-                            fname = f"{safe_name}-({date_label})_{len(sdf)}leads.pdf"
+                            lead_count = len(sdf)
+                            # FIX 3: Filename → ProjectName-(DD-MM-YYYY)_(N leads).pdf
+                            fname = f"{safe_name}-({date_label})_({lead_count} leads).pdf"
                             if final_save_dir:
                                 try:
                                     with open(os.path.join(final_save_dir, fname), 'wb') as f:
@@ -478,7 +605,6 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
                                     pass
                             zf.writestr(fname, pdf_bytes)
 
-            # ZIP ને session_state માં store કરો — download button rerun avoid કરે
             st.session_state["master_zip"] = master_zip.getvalue()
             st.session_state["zip_date_label"] = date_label
 
@@ -492,7 +618,7 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
             st.error(f"Error: {e}")
             st.exception(e)
 
-# Download button — session_state માંથી show કરો, generate button સાથે tied નહીં
+# Download button — session_state માંથી show કરો
 if "master_zip" in st.session_state:
     date_label_dl = st.session_state.get("zip_date_label", "")
     st.download_button(
