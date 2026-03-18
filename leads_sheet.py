@@ -383,11 +383,18 @@ def load_all_sheets(sheet_names_list, auto_fetch_all):
     if auto_fetch_all:
         try:
             files = client.list_spreadsheet_files()
-            all_spreadsheets = [s['title'] if isinstance(s, dict) else s.title for s in files]
+            fetched = [s['title'] if isinstance(s, dict) else s.title for s in files]
+            # Always include manually saved sheet names too (Streamlit Cloud par list may be incomplete)
+            all_spreadsheets = list(dict.fromkeys(fetched + sheet_names_list))
         except Exception as e:
             all_spreadsheets = sheet_names_list
     else:
         all_spreadsheets = sheet_names_list
+    
+    # Safety: if still empty, nothing to load
+    if not all_spreadsheets:
+        st.sidebar.warning("⚠️ No sheet names found. Add sheets in sidebar and Save Settings.")
+        return None
 
     all_dfs = []
     load_errors = []
