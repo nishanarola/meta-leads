@@ -31,13 +31,26 @@ st.title("Enacle — Leads Report")
 SHEETS_CONFIG_FILE = "sheets_config.json"
 
 def load_sheet_names():
+    # Try local file first (works locally)
     if os.path.exists(SHEETS_CONFIG_FILE):
         try:
             with open(SHEETS_CONFIG_FILE, "r") as f:
                 data = json.load(f)
-                return data.get("sheets", []), data.get("auto_fetch", True)
+                names = data.get("sheets", [])
+                auto  = data.get("auto_fetch", True)
+                if names:
+                    return names, auto
         except:
             pass
+    # Fallback: check Streamlit secrets for sheet names
+    # Add [sheet_names] section in Streamlit Cloud secrets:
+    # sheets = "Sheet1,Sheet2"
+    try:
+        secret_sheets = st.secrets.get("sheet_names", {}).get("sheets", "")
+        if secret_sheets:
+            return [s.strip() for s in secret_sheets.split(",") if s.strip()], False
+    except:
+        pass
     return [], True
 
 def save_sheet_names(names, auto_fetch):
