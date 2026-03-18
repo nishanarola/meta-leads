@@ -41,31 +41,55 @@ def save_sheet_names(names, auto_fetch):
     with open(SHEETS_CONFIG_FILE, "w") as f:
         json.dump({"sheets": names, "auto_fetch": auto_fetch}, f, indent=2)
 
-FONT_PATH = "NotoSansGujarati-Regular.ttf"
+FONT_PATH       = "NotoSansGujarati-Regular.ttf"
+HINDI_FONT_PATH = "NotoSansDevanagari-Regular.ttf"
 
 def download_font():
-    if os.path.exists(FONT_PATH) and os.path.getsize(FONT_PATH) > 10000:
-        return True
-    try:
-        urls = [
-            "https://github.com/google/fonts/raw/main/ofl/notosansgujarati/NotoSansGujarati-Regular.ttf",
-            "https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSansGujarati/NotoSansGujarati-Regular.ttf",
-            "https://raw.githubusercontent.com/google/fonts/main/ofl/notosansgujarati/NotoSansGujarati-Regular.ttf",
-        ]
-        for url in urls:
-            try:
-                r = requests.get(url, timeout=20, headers={"User-Agent": "Mozilla/5.0"})
-                if r.status_code == 200 and len(r.content) > 10000:
-                    with open(FONT_PATH, "wb") as f:
-                        f.write(r.content)
-                    return True
-            except:
-                continue
-    except:
-        pass
-    return False
+    # ── Gujarati Font ──────────────────────────────────────
+    if not (os.path.exists(FONT_PATH) and os.path.getsize(FONT_PATH) > 10000):
+        try:
+            gujarati_urls = [
+                "https://github.com/google/fonts/raw/main/ofl/notosansgujarati/NotoSansGujarati-Regular.ttf",
+                "https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSansGujarati/NotoSansGujarati-Regular.ttf",
+                "https://raw.githubusercontent.com/google/fonts/main/ofl/notosansgujarati/NotoSansGujarati-Regular.ttf",
+            ]
+            for url in gujarati_urls:
+                try:
+                    r = requests.get(url, timeout=20, headers={"User-Agent": "Mozilla/5.0"})
+                    if r.status_code == 200 and len(r.content) > 10000:
+                        with open(FONT_PATH, "wb") as f:
+                            f.write(r.content)
+                        break
+                except:
+                    continue
+        except:
+            pass
+
+    # ── Hindi / Devanagari Font ────────────────────────────
+    if not (os.path.exists(HINDI_FONT_PATH) and os.path.getsize(HINDI_FONT_PATH) > 10000):
+        try:
+            hindi_urls = [
+                "https://github.com/google/fonts/raw/main/ofl/notosansdevanagari/NotoSansDevanagari%5Bwdth%2Cwght%5D.ttf",
+                "https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSansDevanagari/NotoSansDevanagari-Regular.ttf",
+                "https://github.com/google/fonts/raw/main/ofl/notosansdevanagari/NotoSansDevanagari-Regular.ttf",
+            ]
+            for url in hindi_urls:
+                try:
+                    r = requests.get(url, timeout=20, headers={"User-Agent": "Mozilla/5.0"})
+                    if r.status_code == 200 and len(r.content) > 10000:
+                        with open(HINDI_FONT_PATH, "wb") as f:
+                            f.write(r.content)
+                        break
+                except:
+                    continue
+        except:
+            pass
+
+    return os.path.exists(FONT_PATH) and os.path.getsize(FONT_PATH) > 10000
 
 FONT_AVAILABLE = download_font()
+HINDI_FONT_AVAILABLE = os.path.exists(HINDI_FONT_PATH) and os.path.getsize(HINDI_FONT_PATH) > 10000
+
 
 def normalize_unicode(text):
     import unicodedata
@@ -108,16 +132,43 @@ def clean_col_name(col):
     col = col.replace('_', ' ').strip()
     return col
 
+# ── Font helpers ───────────────────────────────────────────
+
+def has_devanagari(text):
+    """Hindi / Devanagari Unicode range: U+0900–U+097F"""
+    return any('\u0900' <= ch <= '\u097F' for ch in str(text))
+
+def has_gujarati(text):
+    """Gujarati Unicode range: U+0A80–U+0AFF"""
+    return any('\u0A80' <= ch <= '\u0AFF' for ch in str(text))
+
+def best_font_for(text, default_font):
+    """Return the most appropriate registered font for the given text."""
+    if has_devanagari(text) and HINDI_FONT_AVAILABLE:
+        return "HindiFont"
+    if has_gujarati(text) and FONT_AVAILABLE:
+        return "GujaratiFont"
+    return default_font
+
+
 def generate_pdf(df, report_date, title="Leads Report"):
     buffer = io.BytesIO()
 
-    font_name = "Helvetica"
+    # ── Register fonts ─────────────────────────────────────
+    base_font = "Helvetica"
+
     if FONT_AVAILABLE and os.path.exists(FONT_PATH):
         try:
             pdfmetrics.registerFont(TTFont("GujaratiFont", FONT_PATH))
-            font_name = "GujaratiFont"
+            base_font = "GujaratiFont"
         except:
-            font_name = "Helvetica"
+            base_font = "Helvetica"
+
+    if HINDI_FONT_AVAILABLE and os.path.exists(HINDI_FONT_PATH):
+        try:
+            pdfmetrics.registerFont(TTFont("HindiFont", HINDI_FONT_PATH))
+        except:
+            pass
 
     doc = SimpleDocTemplate(
         buffer,
@@ -128,10 +179,12 @@ def generate_pdf(df, report_date, title="Leads Report"):
         bottomMargin=10*mm
     )
 
-    title_style = ParagraphStyle('CustomTitle', fontName=font_name, fontSize=16, alignment=1, spaceAfter=8, textColor=colors.HexColor('#1a1a2e'))
-    subtitle_style = ParagraphStyle('Subtitle', fontName=font_name, fontSize=11, alignment=1, spaceAfter=4, textColor=colors.HexColor('#555555'))
-    header_style = ParagraphStyle('Header', fontName=font_name, fontSize=10, alignment=1, leading=13, textColor=colors.white)
-    cell_style = ParagraphStyle('Cell', fontName=font_name, fontSize=9, alignment=1, leading=12, textColor=colors.HexColor('#222222'))
+    # ── Styles ─────────────────────────────────────────────
+    title_font  = best_font_for(title, base_font)
+    title_style    = ParagraphStyle('CustomTitle', fontName=title_font,  fontSize=16, alignment=1, spaceAfter=8,  textColor=colors.HexColor('#1a1a2e'))
+    subtitle_style = ParagraphStyle('Subtitle',    fontName=base_font,   fontSize=11, alignment=1, spaceAfter=4,  textColor=colors.HexColor('#555555'))
+    header_style   = ParagraphStyle('Header',      fontName=base_font,   fontSize=10, alignment=1, leading=13,    textColor=colors.white)
+    cell_style     = ParagraphStyle('Cell',        fontName=base_font,   fontSize=9,  alignment=1, leading=12,    textColor=colors.HexColor('#222222'))
 
     elements = []
     elements.append(Paragraph(clean_html(title), title_style))
@@ -140,10 +193,24 @@ def generate_pdf(df, report_date, title="Leads Report"):
 
     if not df.empty:
         clean_cols = [clean_col_name(c) for c in df.columns]
-        header_row = [Paragraph(c, header_style) for c in clean_cols]
+
+        # Header row — column names usually English, but support non-Latin too
+        header_row = []
+        for c in clean_cols:
+            fnt = best_font_for(c, base_font)
+            hs  = ParagraphStyle('Hdr', fontName=fnt, fontSize=10, alignment=1, leading=13, textColor=colors.white)
+            header_row.append(Paragraph(c, hs))
+
+        # Data rows — choose font per cell based on content
         data_rows = []
         for _, row in df.iterrows():
-            data_rows.append([Paragraph(clean_html(v), cell_style) for v in row])
+            cells = []
+            for v in row:
+                txt = clean_html(v)
+                fnt = best_font_for(txt, base_font)
+                cs  = ParagraphStyle('CS', fontName=fnt, fontSize=9, alignment=1, leading=12, textColor=colors.HexColor('#222222'))
+                cells.append(Paragraph(txt, cs))
+            data_rows.append(cells)
 
         table_data = [header_row] + data_rows
         page_w = landscape(A4)[0] - 16*mm
@@ -171,7 +238,7 @@ def generate_pdf(df, report_date, title="Leads Report"):
             ('TEXTCOLOR',     (0, 0), (-1, 0),  colors.white),
             ('ALIGN',         (0, 0), (-1, -1), 'CENTER'),
             ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
-            ('FONTNAME',      (0, 0), (-1, -1), font_name),
+            ('FONTNAME',      (0, 0), (-1, -1), base_font),
             ('FONTSIZE',      (0, 0), (-1, 0),  10),
             ('FONTSIZE',      (0, 1), (-1, -1), 9),
             ('TOPPADDING',    (0, 0), (-1, 0),  8),
@@ -321,8 +388,6 @@ st.sidebar.markdown("### 📋 Manual Sheet Names")
 if "sheet_names" not in st.session_state:
     st.session_state.sheet_names = saved_names if saved_names else ["Gopinathji Grp"]
 
-# Unique ID based approach — index problem avoid કરો
-# દરેક sheet ને unique id આપો
 if "sheet_ids" not in st.session_state or len(st.session_state.sheet_ids) != len(st.session_state.sheet_names):
     import uuid
     st.session_state.sheet_ids = [str(uuid.uuid4())[:8] for _ in st.session_state.sheet_names]
@@ -330,7 +395,6 @@ if "sheet_ids" not in st.session_state or len(st.session_state.sheet_ids) != len
 delete_id = None
 for uid, name in zip(st.session_state.sheet_ids, st.session_state.sheet_names):
     cols = st.sidebar.columns([5, 1])
-    # key = uid based — unique per sheet, not index based
     new_val = cols[0].text_input(
         uid,
         value=name,
@@ -338,7 +402,6 @@ for uid, name in zip(st.session_state.sheet_ids, st.session_state.sheet_names):
         placeholder="Spreadsheet name...",
         key=f"sheet_{uid}"
     )
-    # directly update name as user types
     idx = st.session_state.sheet_ids.index(uid)
     st.session_state.sheet_names[idx] = new_val
     if cols[1].button("🗑️", key=f"del_{uid}"):
@@ -372,6 +435,12 @@ if current_names:
     st.sidebar.markdown("**📌 Currently Saved:**")
     for n in current_names:
         st.sidebar.markdown(f"• {n}")
+
+# Font status indicator in sidebar
+st.sidebar.divider()
+st.sidebar.markdown("**🔤 Font Status:**")
+st.sidebar.markdown(f"{'✅' if FONT_AVAILABLE else '❌'} Gujarati Font")
+st.sidebar.markdown(f"{'✅' if HINDI_FONT_AVAILABLE else '❌'} Hindi Font")
 
 # ── Main ──────────────────────────────────────────────────
 ist = pytz.timezone('Asia/Kolkata')
@@ -444,7 +513,6 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
             except:
                 final_save_dir = None
 
-            # બધી sheets ના PDFs એક જ ZIP માં
             master_zip = io.BytesIO()
             with zipfile.ZipFile(master_zip, "a", zipfile.ZIP_DEFLATED, False) as zf:
                 for sname in found_spreadsheets:
@@ -478,7 +546,6 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
                                     pass
                             zf.writestr(fname, pdf_bytes)
 
-            # ZIP ને session_state માં store કરો — download button rerun avoid કરે
             st.session_state["master_zip"] = master_zip.getvalue()
             st.session_state["zip_date_label"] = date_label
 
@@ -492,7 +559,7 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
             st.error(f"Error: {e}")
             st.exception(e)
 
-# Download button — session_state માંથી show કરો, generate button સાથે tied નહીં
+# Download button
 if "master_zip" in st.session_state:
     date_label_dl = st.session_state.get("zip_date_label", "")
     st.download_button(
