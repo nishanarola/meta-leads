@@ -1,5 +1,12 @@
 import streamlit as st
 import pandas as pd
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib import colors
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.lib.units import mm
 from datetime import datetime, timedelta
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
@@ -12,18 +19,8 @@ import zipfile
 from dateutil import parser as dtparser
 from dotenv import load_dotenv
 import re
-import unicodedata as _ud
 
 load_dotenv()
-
-from reportlab.lib.pagesizes import A4, landscape
-from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-from reportlab.lib.styles import ParagraphStyle
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.lib.units import mm
-
 
 st.set_page_config(page_title="Enacle", page_icon="🏠", layout="wide")
 st.title("Enacle — Leads Report")
@@ -31,106 +28,44 @@ st.title("Enacle — Leads Report")
 SHEETS_CONFIG_FILE = "sheets_config.json"
 
 def load_sheet_names():
-    # Try local file first (works locally)
     if os.path.exists(SHEETS_CONFIG_FILE):
         try:
             with open(SHEETS_CONFIG_FILE, "r") as f:
                 data = json.load(f)
-                names = data.get("sheets", [])
-                auto  = data.get("auto_fetch", True)
-                if names:
-                    return names, auto
+                return data.get("sheets", []), data.get("auto_fetch", True)
         except:
             pass
-    # Fallback: check Streamlit secrets for sheet names
-    # Add [sheet_names] section in Streamlit Cloud secrets:
-    # sheets = "Sheet1,Sheet2"
-    try:
-        secret_sheets = st.secrets.get("sheet_names", {}).get("sheets", "")
-        if secret_sheets:
-            return [s.strip() for s in secret_sheets.split(",") if s.strip()], False
-    except:
-        pass
     return [], True
 
 def save_sheet_names(names, auto_fetch):
     with open(SHEETS_CONFIG_FILE, "w") as f:
         json.dump({"sheets": names, "auto_fetch": auto_fetch}, f, indent=2)
 
-# ── Font paths — NotoSans covers Gujarati + Devanagari (Hindi) ───────────────
-# fpdf2 uses a SINGLE font file that supports ALL Unicode — NotoSans covers both
-FONT_PATH            = "NotoSansGujarati-Regular.ttf"
-DEVANAGARI_FONT_PATH = "NotoSansDevanagari-Regular.ttf"
-# Best single font for mixed Gujarati+Hindi+Latin: NotoSans (full Unicode)
-NOTO_FULL_PATH       = "NotoSans-Regular.ttf"
+FONT_PATH = "NotoSansGujarati-Regular.ttf"
 
 def download_font():
-    """Download fonts. fpdf2 uses font files directly — no registration needed."""
-    ok = False
-
-    # 1. Try NotoSans full (covers Latin+Gujarati+Devanagari in one file)
-    if os.path.exists(NOTO_FULL_PATH) and os.path.getsize(NOTO_FULL_PATH) > 10000:
-        ok = True
-    else:
-        for url in [
-            "https://github.com/google/fonts/raw/main/ofl/notosans/NotoSans-Regular.ttf",
-            "https://raw.githubusercontent.com/googlefonts/noto-fonts/main/hinted/ttf/NotoSans/NotoSans-Regular.ttf",
-        ]:
-            try:
-                r = requests.get(url, timeout=20, headers={"User-Agent": "Mozilla/5.0"})
-                if r.status_code == 200 and len(r.content) > 10000:
-                    with open(NOTO_FULL_PATH, "wb") as f:
-                        f.write(r.content)
-                    ok = True
-                    break
-            except:
-                continue
-
-    # 2. Gujarati fallback
-    if not os.path.exists(FONT_PATH) or os.path.getsize(FONT_PATH) < 10000:
-        for url in [
+    if os.path.exists(FONT_PATH) and os.path.getsize(FONT_PATH) > 10000:
+        return True
+    try:
+        urls = [
             "https://github.com/google/fonts/raw/main/ofl/notosansgujarati/NotoSansGujarati-Regular.ttf",
+            "https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSansGujarati/NotoSansGujarati-Regular.ttf",
             "https://raw.githubusercontent.com/google/fonts/main/ofl/notosansgujarati/NotoSansGujarati-Regular.ttf",
-        ]:
+        ]
+        for url in urls:
             try:
                 r = requests.get(url, timeout=20, headers={"User-Agent": "Mozilla/5.0"})
                 if r.status_code == 200 and len(r.content) > 10000:
                     with open(FONT_PATH, "wb") as f:
                         f.write(r.content)
-                    ok = True
-                    break
+                    return True
             except:
                 continue
-
-    # 3. Devanagari fallback
-    if not os.path.exists(DEVANAGARI_FONT_PATH) or os.path.getsize(DEVANAGARI_FONT_PATH) < 10000:
-        for url in [
-            "https://github.com/google/fonts/raw/main/ofl/notosansdevanagari/NotoSansDevanagari-Regular.ttf",
-            "https://raw.githubusercontent.com/google/fonts/main/ofl/notosansdevanagari/NotoSansDevanagari-Regular.ttf",
-        ]:
-            try:
-                r = requests.get(url, timeout=20, headers={"User-Agent": "Mozilla/5.0"})
-                if r.status_code == 200 and len(r.content) > 10000:
-                    with open(DEVANAGARI_FONT_PATH, "wb") as f:
-                        f.write(r.content)
-                    ok = True
-                    break
-            except:
-                continue
-
-    return ok
+    except:
+        pass
+    return False
 
 FONT_AVAILABLE = download_font()
-
-def _best_font_path():
-    """Return path to best available font file for fpdf2."""
-    if os.path.exists(NOTO_FULL_PATH) and os.path.getsize(NOTO_FULL_PATH) > 10000:
-        return NOTO_FULL_PATH
-    if os.path.exists(FONT_PATH) and os.path.getsize(FONT_PATH) > 10000:
-        return FONT_PATH
-    if os.path.exists(DEVANAGARI_FONT_PATH) and os.path.getsize(DEVANAGARI_FONT_PATH) > 10000:
-        return DEVANAGARI_FONT_PATH
-    return None
 
 def normalize_unicode(text):
     import unicodedata
@@ -176,91 +111,84 @@ def clean_col_name(col):
 def generate_pdf(df, report_date, title="Leads Report"):
     buffer = io.BytesIO()
 
-    # Register font if available
     font_name = "Helvetica"
-    for fname, fpath, regname in [
-        ("NotoSans",          NOTO_FULL_PATH,        "NotoSans"),
-        ("NotoSansGujarati",  FONT_PATH,              "NotoSansGujarati"),
-        ("NotoSansDevanagari",DEVANAGARI_FONT_PATH,   "NotoSansDevanagari"),
-    ]:
-        if os.path.exists(fpath) and os.path.getsize(fpath) > 10000:
-            try:
-                pdfmetrics.registerFont(TTFont(regname, fpath))
-                font_name = regname
-                break
-            except Exception:
-                continue
+    if FONT_AVAILABLE and os.path.exists(FONT_PATH):
+        try:
+            pdfmetrics.registerFont(TTFont("GujaratiFont", FONT_PATH))
+            font_name = "GujaratiFont"
+        except:
+            font_name = "Helvetica"
 
     doc = SimpleDocTemplate(
         buffer,
         pagesize=landscape(A4),
-        rightMargin=8*mm, leftMargin=8*mm,
-        topMargin=10*mm,  bottomMargin=10*mm
+        rightMargin=8*mm,
+        leftMargin=8*mm,
+        topMargin=10*mm,
+        bottomMargin=10*mm
     )
 
-    title_style    = ParagraphStyle('T', fontName=font_name, fontSize=16, alignment=1, spaceAfter=8,  textColor=colors.HexColor('#1a1a2e'))
-    subtitle_style = ParagraphStyle('S', fontName=font_name, fontSize=11, alignment=1, spaceAfter=4,  textColor=colors.HexColor('#555555'))
-    header_style   = ParagraphStyle('H', fontName=font_name, fontSize=10, alignment=1, leading=13,    textColor=colors.white)
-    cell_style     = ParagraphStyle('C', fontName=font_name, fontSize=9,  alignment=1, leading=12,    textColor=colors.HexColor('#222222'))
+    title_style = ParagraphStyle('CustomTitle', fontName=font_name, fontSize=16, alignment=1, spaceAfter=8, textColor=colors.HexColor('#1a1a2e'))
+    subtitle_style = ParagraphStyle('Subtitle', fontName=font_name, fontSize=11, alignment=1, spaceAfter=4, textColor=colors.HexColor('#555555'))
+    header_style = ParagraphStyle('Header', fontName=font_name, fontSize=10, alignment=1, leading=13, textColor=colors.white)
+    cell_style = ParagraphStyle('Cell', fontName=font_name, fontSize=9, alignment=1, leading=12, textColor=colors.HexColor('#222222'))
 
-    elements = [
-        Paragraph(clean_html(title), title_style),
-        Paragraph(f"Date: {report_date}   |   Total Leads: {len(df)}", subtitle_style),
-        Spacer(1, 4*mm),
-    ]
+    elements = []
+    elements.append(Paragraph(clean_html(title), title_style))
+    elements.append(Paragraph(f"Date: {report_date}   |   Total Leads: {len(df)}", subtitle_style))
+    elements.append(Spacer(1, 4*mm))
 
     if not df.empty:
         clean_cols = [clean_col_name(c) for c in df.columns]
         header_row = [Paragraph(c, header_style) for c in clean_cols]
-        data_rows  = []
+        data_rows = []
         for _, row in df.iterrows():
-            data_rows.append([Paragraph(clean_html(str(v)), cell_style) for v in row])
+            data_rows.append([Paragraph(clean_html(v), cell_style) for v in row])
 
         table_data = [header_row] + data_rows
-        page_w     = landscape(A4)[0] - 16*mm
+        page_w = landscape(A4)[0] - 16*mm
 
-        raw_w = []
+        raw_widths = []
         for col in df.columns:
             c = col.lower()
-            if any(x in c for x in ['date','time']):       raw_w.append(20)
-            elif any(x in c for x in ['phone','mobile']):  raw_w.append(28)
-            elif 'name' in c:                              raw_w.append(30)
-            elif not col.isascii():                        raw_w.append(38)
-            else:                                          raw_w.append(24)
-        col_widths = [w * page_w / sum(raw_w) for w in raw_w]
+            if any(x in c for x in ['date', 'time']):
+                raw_widths.append(20)
+            elif any(x in c for x in ['phone', 'mobile']):
+                raw_widths.append(28)
+            elif 'name' in c:
+                raw_widths.append(30)
+            elif not col.isascii():
+                raw_widths.append(38)
+            else:
+                raw_widths.append(24)
+
+        total = sum(raw_widths)
+        col_widths = [w * page_w / total for w in raw_widths]
 
         table = Table(table_data, colWidths=col_widths, repeatRows=1)
         table.setStyle(TableStyle([
-            ('BACKGROUND',     (0,0),(-1,0),  colors.HexColor('#34495e')),
-            ('TEXTCOLOR',      (0,0),(-1,0),  colors.white),
-            ('ALIGN',          (0,0),(-1,-1), 'CENTER'),
-            ('VALIGN',         (0,0),(-1,-1), 'MIDDLE'),
-            ('FONTNAME',       (0,0),(-1,-1), font_name),
-            ('FONTSIZE',       (0,0),(-1,0),  10),
-            ('FONTSIZE',       (0,1),(-1,-1), 9),
-            ('TOPPADDING',     (0,0),(-1,0),  8),
-            ('BOTTOMPADDING',  (0,0),(-1,0),  8),
-            ('TOPPADDING',     (0,1),(-1,-1), 7),
-            ('BOTTOMPADDING',  (0,1),(-1,-1), 7),
-            ('LEFTPADDING',    (0,0),(-1,-1), 3),
-            ('RIGHTPADDING',   (0,0),(-1,-1), 3),
-            ('ROWBACKGROUNDS', (0,1),(-1,-1), [colors.HexColor('#f5f5f5'), colors.white]),
-            ('GRID',           (0,0),(-1,-1), 0.4, colors.HexColor('#cccccc')),
-            ('LINEBELOW',      (0,0),(-1,0),  1,   colors.HexColor('#2c3e50')),
+            ('BACKGROUND',    (0, 0), (-1, 0),  colors.HexColor('#34495e')),
+            ('TEXTCOLOR',     (0, 0), (-1, 0),  colors.white),
+            ('ALIGN',         (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
+            ('FONTNAME',      (0, 0), (-1, -1), font_name),
+            ('FONTSIZE',      (0, 0), (-1, 0),  10),
+            ('FONTSIZE',      (0, 1), (-1, -1), 9),
+            ('TOPPADDING',    (0, 0), (-1, 0),  8),
+            ('BOTTOMPADDING', (0, 0), (-1, 0),  8),
+            ('TOPPADDING',    (0, 1), (-1, -1), 7),
+            ('BOTTOMPADDING', (0, 1), (-1, -1), 7),
+            ('LEFTPADDING',   (0, 0), (-1, -1), 3),
+            ('RIGHTPADDING',  (0, 0), (-1, -1), 3),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f5f5f5'), colors.white]),
+            ('GRID',          (0, 0), (-1, -1), 0.4, colors.HexColor('#cccccc')),
+            ('LINEBELOW',     (0, 0), (-1, 0),  1,   colors.HexColor('#2c3e50')),
         ]))
         elements.append(table)
 
     doc.build(elements)
     return buffer.getvalue()
 
-def _try_formats(s):
-    """Try explicit date formats before falling back to dateutil."""
-    for fmt in _DATE_FMTS:
-        try:
-            return pd.Timestamp(datetime.strptime(s.strip(), fmt))
-        except:
-            continue
-    return None
 
 def parse_to_ist(series):
     results = []
@@ -272,18 +200,13 @@ def parse_to_ist(series):
             if not s or s in ('nan', 'None', 'NaT'):
                 results.append(pd.NaT)
                 continue
-            # FIX 2: Try explicit formats first (prevents silent parse failures)
-            explicit = _try_formats(s)
-            if explicit is not None:
-                parsed = explicit
-            if pd.isnull(parsed):
-                try:
-                    dt = dtparser.parse(s)
-                    if dt.tzinfo is not None:
-                        dt = dt.astimezone(ist_tz).replace(tzinfo=None)
-                    parsed = pd.Timestamp(dt)
-                except:
-                    pass
+            try:
+                dt = dtparser.parse(s)
+                if dt.tzinfo is not None:
+                    dt = dt.astimezone(ist_tz).replace(tzinfo=None)
+                parsed = pd.Timestamp(dt)
+            except:
+                pass
             if pd.isnull(parsed):
                 try:
                     ts = pd.to_datetime(s, utc=True)
@@ -330,27 +253,18 @@ def load_all_sheets(sheet_names_list, auto_fetch_all):
     if auto_fetch_all:
         try:
             files = client.list_spreadsheet_files()
-            fetched = [s['title'] if isinstance(s, dict) else s.title for s in files]
-            # Always include manually saved sheet names too (Streamlit Cloud par list may be incomplete)
-            all_spreadsheets = list(dict.fromkeys(fetched + sheet_names_list))
+            all_spreadsheets = [s['title'] if isinstance(s, dict) else s.title for s in files]
         except Exception as e:
             all_spreadsheets = sheet_names_list
     else:
         all_spreadsheets = sheet_names_list
-    
-    # Safety: if still empty, nothing to load
-    if not all_spreadsheets:
-        st.sidebar.warning("⚠️ No sheet names found. Add sheets in sidebar and Save Settings.")
-        return None
 
     all_dfs = []
-    load_errors = []
     for spreadsheet_name in all_spreadsheets:
         try:
             spreadsheet = client.open(spreadsheet_name)
             worksheets = spreadsheet.worksheets()
-        except Exception as e:
-            load_errors.append(f"Cannot open '{spreadsheet_name}': {e}")
+        except:
             continue
         for ws in worksheets:
             try:
@@ -370,7 +284,6 @@ def load_all_sheets(sheet_names_list, auto_fetch_all):
                 mask = df.apply(lambda row: row.astype(str).str.contains('__TEST_ROW__').any(), axis=1)
                 df = df[~mask].reset_index(drop=True)
                 if 'created_time' not in df.columns:
-                    load_errors.append(f"'{spreadsheet_name}/{ws.title}' — no created_time col. Cols: {list(df.columns)}")
                     continue
                 df['created_dt'] = parse_to_ist(df['created_time'])
                 df['created_time'] = df['created_dt'].dt.strftime('%d-%m-%Y')
@@ -391,15 +304,8 @@ def load_all_sheets(sheet_names_list, auto_fetch_all):
                                 'platform', 'lead_status', 'adset']
                 df = df.drop(columns=[c for c in cols_to_drop if c in df.columns])
                 all_dfs.append(df)
-            except Exception as e:
-                load_errors.append(f"'{spreadsheet_name}/{ws.title}': {e}")
+            except:
                 continue
-
-    if load_errors:
-        with st.sidebar.expander(f"⚠️ Debug ({len(load_errors)} issues)", expanded=True):
-            for err in load_errors:
-                st.write(err)
-
     if not all_dfs:
         return None
     return pd.concat(all_dfs, ignore_index=True)
@@ -415,6 +321,8 @@ st.sidebar.markdown("### 📋 Manual Sheet Names")
 if "sheet_names" not in st.session_state:
     st.session_state.sheet_names = saved_names if saved_names else ["Gopinathji Grp"]
 
+# Unique ID based approach — index problem avoid કરો
+# દરેક sheet ને unique id આપો
 if "sheet_ids" not in st.session_state or len(st.session_state.sheet_ids) != len(st.session_state.sheet_names):
     import uuid
     st.session_state.sheet_ids = [str(uuid.uuid4())[:8] for _ in st.session_state.sheet_names]
@@ -422,6 +330,7 @@ if "sheet_ids" not in st.session_state or len(st.session_state.sheet_ids) != len
 delete_id = None
 for uid, name in zip(st.session_state.sheet_ids, st.session_state.sheet_names):
     cols = st.sidebar.columns([5, 1])
+    # key = uid based — unique per sheet, not index based
     new_val = cols[0].text_input(
         uid,
         value=name,
@@ -429,6 +338,7 @@ for uid, name in zip(st.session_state.sheet_ids, st.session_state.sheet_names):
         placeholder="Spreadsheet name...",
         key=f"sheet_{uid}"
     )
+    # directly update name as user types
     idx = st.session_state.sheet_ids.index(uid)
     st.session_state.sheet_names[idx] = new_val
     if cols[1].button("🗑️", key=f"del_{uid}"):
@@ -506,12 +416,7 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
             if filtered.empty:
                 filtered = df[df['created_time'] == date_label].copy()
             if filtered.empty:
-                # FIX 2: Show sample dates to help debug missing leads
-                sample_dates = df['created_time'].dropna().unique()[:8].tolist()
-                st.error(
-                    f"❌ No Leads Found for {date_label}.\n\n"
-                    f"Sample dates found in sheets: `{sample_dates}`"
-                )
+                st.error(f"❌ No Leads Found for {date_label}.")
                 st.stop()
 
             found_spreadsheets = filtered['_spreadsheet'].unique().tolist()
@@ -539,6 +444,7 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
             except:
                 final_save_dir = None
 
+            # બધી sheets ના PDFs એક જ ZIP માં
             master_zip = io.BytesIO()
             with zipfile.ZipFile(master_zip, "a", zipfile.ZIP_DEFLATED, False) as zf:
                 for sname in found_spreadsheets:
@@ -563,9 +469,7 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
                             continue
                         if pdf_bytes and len(pdf_bytes) > 100:
                             safe_name = project_name.replace(' ', '-')
-                            lead_count = len(sdf)
-                            # FIX 3: Filename → ProjectName-(DD-MM-YYYY)_(N leads).pdf
-                            fname = f"{safe_name}-({date_label})_({lead_count} leads).pdf"
+                            fname = f"{safe_name}-({date_label})_{len(sdf)}leads.pdf"
                             if final_save_dir:
                                 try:
                                     with open(os.path.join(final_save_dir, fname), 'wb') as f:
@@ -574,6 +478,7 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
                                     pass
                             zf.writestr(fname, pdf_bytes)
 
+            # ZIP ને session_state માં store કરો — download button rerun avoid કરે
             st.session_state["master_zip"] = master_zip.getvalue()
             st.session_state["zip_date_label"] = date_label
 
@@ -587,7 +492,7 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
             st.error(f"Error: {e}")
             st.exception(e)
 
-# Download button — session_state માંથી show કરો
+# Download button — session_state માંથી show કરો, generate button સાથે tied નહીં
 if "master_zip" in st.session_state:
     date_label_dl = st.session_state.get("zip_date_label", "")
     st.download_button(
