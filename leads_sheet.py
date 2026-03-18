@@ -436,6 +436,12 @@ if current_names:
     for n in current_names:
         st.sidebar.markdown(f"• {n}")
 
+# Font status indicator in sidebar
+st.sidebar.divider()
+st.sidebar.markdown("**🔤 Font Status:**")
+st.sidebar.markdown(f"{'✅' if FONT_AVAILABLE else '❌'} Gujarati Font")
+st.sidebar.markdown(f"{'✅' if HINDI_FONT_AVAILABLE else '❌'} Hindi Font")
+
 # ── Main ──────────────────────────────────────────────────
 ist = pytz.timezone('Asia/Kolkata')
 now_ist = datetime.now(ist)
@@ -531,7 +537,7 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
                             continue
                         if pdf_bytes and len(pdf_bytes) > 100:
                             safe_name = project_name.replace(' ', '-')
-                            fname = f"{safe_name}-({date_label})_{len(sdf)}leads.pdf"
+                            fname = f"{safe_name}-({date_label})_({len(sdf)} Leads).pdf"
                             if final_save_dir:
                                 try:
                                     with open(os.path.join(final_save_dir, fname), 'wb') as f:
