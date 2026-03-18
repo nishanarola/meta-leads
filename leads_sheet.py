@@ -16,9 +16,14 @@ import unicodedata as _ud
 
 load_dotenv()
 
-# ── PDF: fpdf2 (proper Indic/Unicode shaping, replaces reportlab) ─────────────
-# pip install fpdf2
-from fpdf import FPDF
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib import colors
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.styles import ParagraphStyle
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.lib.units import mm
+
 
 st.set_page_config(page_title="Enacle", page_icon="🏠", layout="wide")
 st.title("Enacle — Leads Report")
@@ -156,155 +161,84 @@ def clean_col_name(col):
     return col
 
 def generate_pdf(df, report_date, title="Leads Report"):
-    """
-    HTML → PDF via weasyprint — full browser-level Unicode/Gujarati/Hindi shaping.
-    pip install weasyprint
-    Font files (NotoSans*.ttf) must exist in the working directory.
-    """
-    import base64
+    buffer = io.BytesIO()
 
-    # ── Build font CSS (@font-face) ────────────────────────────────────────────
-    font_css = ""
-    font_family = "Arial, sans-serif"
-
-    def font_b64(path):
-        with open(path, "rb") as f:
-            return base64.b64encode(f.read()).decode()
-
-    noto_paths = [
-        ("NotoSansGujarati", FONT_PATH),
-        ("NotoSansDevanagari", DEVANAGARI_FONT_PATH),
-        ("NotoSans", NOTO_FULL_PATH),
-    ]
-    loaded = []
-    for fname, fpath in noto_paths:
+    # Register font if available
+    font_name = "Helvetica"
+    for fname, fpath, regname in [
+        ("NotoSans",          NOTO_FULL_PATH,        "NotoSans"),
+        ("NotoSansGujarati",  FONT_PATH,              "NotoSansGujarati"),
+        ("NotoSansDevanagari",DEVANAGARI_FONT_PATH,   "NotoSansDevanagari"),
+    ]:
         if os.path.exists(fpath) and os.path.getsize(fpath) > 10000:
-            b64 = font_b64(fpath)
-            font_css += f"""
-@font-face {{
-    font-family: '{fname}';
-    src: url('data:font/truetype;base64,{b64}') format('truetype');
-}}"""
-            loaded.append(fname)
+            try:
+                pdfmetrics.registerFont(TTFont(regname, fpath))
+                font_name = regname
+                break
+            except Exception:
+                continue
 
-    if loaded:
-        font_family = ", ".join(f"'{f}'" for f in loaded) + ", Arial, sans-serif"
-
-    # ── Column width percentages ───────────────────────────────────────────────
-    raw_widths = []
-    for col in df.columns:
-        c = col.lower()
-        if any(x in c for x in ['date', 'time']):       raw_widths.append(22)
-        elif any(x in c for x in ['phone', 'mobile']):  raw_widths.append(32)
-        elif 'name' in c:                                raw_widths.append(35)
-        elif not col.isascii():                          raw_widths.append(40)
-        else:                                            raw_widths.append(26)
-    total = sum(raw_widths)
-    col_pcts = [f"{w*100/total:.2f}%" for w in raw_widths]
-
-    # ── Build HTML table ───────────────────────────────────────────────────────
-    # Header
-    header_cells = "".join(
-        f'<th style="width:{pct}">{clean_col_name(col)}</th>'
-        for col, pct in zip(df.columns, col_pcts)
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(A4),
+        rightMargin=8*mm, leftMargin=8*mm,
+        topMargin=10*mm,  bottomMargin=10*mm
     )
 
-    # Rows
-    row_html = ""
-    for i, (_, row) in enumerate(df.iterrows()):
-        bg = "#f5f5f5" if i % 2 == 0 else "#ffffff"
-        cells = "".join(
-            f'<td>{clean_html(str(v))}</td>' for v in row
-        )
-        row_html += f'<tr style="background:{bg}">{cells}</tr>\n'
+    title_style    = ParagraphStyle('T', fontName=font_name, fontSize=16, alignment=1, spaceAfter=8,  textColor=colors.HexColor('#1a1a2e'))
+    subtitle_style = ParagraphStyle('S', fontName=font_name, fontSize=11, alignment=1, spaceAfter=4,  textColor=colors.HexColor('#555555'))
+    header_style   = ParagraphStyle('H', fontName=font_name, fontSize=10, alignment=1, leading=13,    textColor=colors.white)
+    cell_style     = ParagraphStyle('C', fontName=font_name, fontSize=9,  alignment=1, leading=12,    textColor=colors.HexColor('#222222'))
 
-    html = f"""<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<style>
-{font_css}
+    elements = [
+        Paragraph(clean_html(title), title_style),
+        Paragraph(f"Date: {report_date}   |   Total Leads: {len(df)}", subtitle_style),
+        Spacer(1, 4*mm),
+    ]
 
-* {{ margin: 0; padding: 0; box-sizing: border-box; }}
+    if not df.empty:
+        clean_cols = [clean_col_name(c) for c in df.columns]
+        header_row = [Paragraph(c, header_style) for c in clean_cols]
+        data_rows  = []
+        for _, row in df.iterrows():
+            data_rows.append([Paragraph(clean_html(str(v)), cell_style) for v in row])
 
-@page {{
-    size: A4 landscape;
-    margin: 10mm 10mm 10mm 10mm;
-}}
+        table_data = [header_row] + data_rows
+        page_w     = landscape(A4)[0] - 16*mm
 
-body {{
-    font-family: {font_family};
-    font-size: 9pt;
-    color: #222;
-}}
+        raw_w = []
+        for col in df.columns:
+            c = col.lower()
+            if any(x in c for x in ['date','time']):       raw_w.append(20)
+            elif any(x in c for x in ['phone','mobile']):  raw_w.append(28)
+            elif 'name' in c:                              raw_w.append(30)
+            elif not col.isascii():                        raw_w.append(38)
+            else:                                          raw_w.append(24)
+        col_widths = [w * page_w / sum(raw_w) for w in raw_w]
 
-.title {{
-    text-align: center;
-    font-size: 16pt;
-    color: #1a1a2e;
-    margin-bottom: 3mm;
-    font-family: {font_family};
-}}
+        table = Table(table_data, colWidths=col_widths, repeatRows=1)
+        table.setStyle(TableStyle([
+            ('BACKGROUND',     (0,0),(-1,0),  colors.HexColor('#34495e')),
+            ('TEXTCOLOR',      (0,0),(-1,0),  colors.white),
+            ('ALIGN',          (0,0),(-1,-1), 'CENTER'),
+            ('VALIGN',         (0,0),(-1,-1), 'MIDDLE'),
+            ('FONTNAME',       (0,0),(-1,-1), font_name),
+            ('FONTSIZE',       (0,0),(-1,0),  10),
+            ('FONTSIZE',       (0,1),(-1,-1), 9),
+            ('TOPPADDING',     (0,0),(-1,0),  8),
+            ('BOTTOMPADDING',  (0,0),(-1,0),  8),
+            ('TOPPADDING',     (0,1),(-1,-1), 7),
+            ('BOTTOMPADDING',  (0,1),(-1,-1), 7),
+            ('LEFTPADDING',    (0,0),(-1,-1), 3),
+            ('RIGHTPADDING',   (0,0),(-1,-1), 3),
+            ('ROWBACKGROUNDS', (0,1),(-1,-1), [colors.HexColor('#f5f5f5'), colors.white]),
+            ('GRID',           (0,0),(-1,-1), 0.4, colors.HexColor('#cccccc')),
+            ('LINEBELOW',      (0,0),(-1,0),  1,   colors.HexColor('#2c3e50')),
+        ]))
+        elements.append(table)
 
-.subtitle {{
-    text-align: center;
-    font-size: 11pt;
-    color: #555555;
-    margin-bottom: 5mm;
-    font-family: {font_family};
-}}
-
-table {{
-    width: 100%;
-    border-collapse: collapse;
-    table-layout: fixed;
-    font-family: {font_family};
-}}
-
-thead tr {{
-    background: #34495e;
-    color: #ffffff;
-}}
-
-thead th {{
-    padding: 4pt 3pt;
-    font-size: 9pt;
-    text-align: center;
-    font-weight: bold;
-    word-break: break-word;
-    font-family: {font_family};
-}}
-
-tbody td {{
-    padding: 4pt 3pt;
-    font-size: 8pt;
-    text-align: center;
-    border-bottom: 0.4pt solid #cccccc;
-    word-break: break-word;
-    font-family: {font_family};
-}}
-</style>
-</head>
-<body>
-<div class="title">{clean_html(title)}</div>
-<div class="subtitle">Date: {report_date} &nbsp;|&nbsp; Total Leads: {len(df)}</div>
-<table>
-<thead><tr>{header_cells}</tr></thead>
-<tbody>{row_html}</tbody>
-</table>
-</body>
-</html>"""
-
-    # ── HTML → PDF ─────────────────────────────────────────────────────────────
-    try:
-        from weasyprint import HTML as WP_HTML
-        buf = io.BytesIO()
-        WP_HTML(string=html).write_pdf(buf)
-        return buf.getvalue()
-    except ImportError:
-        # Fallback: return HTML as-is (for debugging if weasyprint not installed)
-        return html.encode('utf-8')
-
+    doc.build(elements)
+    return buffer.getvalue()
 
 def _try_formats(s):
     """Try explicit date formats before falling back to dateutil."""
