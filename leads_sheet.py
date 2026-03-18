@@ -380,38 +380,24 @@ def load_all_sheets(sheet_names_list, auto_fetch_all):
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     client = gspread.authorize(creds)
 
-    # Auto-fetch: list all spreadsheets from Drive
-    # On Streamlit Cloud, list_spreadsheet_files() may return empty → fallback to manual list
     if auto_fetch_all:
         try:
             files = client.list_spreadsheet_files()
-            fetched = [s['title'] if isinstance(s, dict) else s.title for s in files]
-            all_spreadsheets = fetched if fetched else sheet_names_list
-        except Exception:
+            all_spreadsheets = [s['title'] if isinstance(s, dict) else s.title for s in files]
+        except Exception as e:
             all_spreadsheets = sheet_names_list
     else:
         all_spreadsheets = sheet_names_list
 
-    # Deduplicate
-    seen = set()
-    unique = []
-    for s in all_spreadsheets:
-        if s and s not in seen:
-            seen.add(s)
-            unique.append(s)
-    all_spreadsheets = unique
-
     all_dfs = []
     load_errors = []
-
     for spreadsheet_name in all_spreadsheets:
         try:
             spreadsheet = client.open(spreadsheet_name)
-            worksheets  = spreadsheet.worksheets()
+            worksheets = spreadsheet.worksheets()
         except Exception as e:
             load_errors.append(f"Cannot open '{spreadsheet_name}': {e}")
             continue
-
         for ws in worksheets:
             try:
                 data = ws.get_all_values()
@@ -423,39 +409,38 @@ def load_all_sheets(sheet_names_list, auto_fetch_all):
                 if not rows:
                     continue
                 df = pd.DataFrame(rows, columns=headers)
-                df = df.replace("", pd.NA)
+                df = df.replace('', pd.NA)
                 for col in df.columns:
                     df[col] = df[col].apply(lambda x: clean_cell_value(x) if pd.notna(x) else x)
-                    df[col] = df[col].replace("", pd.NA)
-                mask = df.apply(lambda row: row.astype(str).str.contains("__TEST_ROW__").any(), axis=1)
+                    df[col] = df[col].replace('', pd.NA)
+                mask = df.apply(lambda row: row.astype(str).str.contains('__TEST_ROW__').any(), axis=1)
                 df = df[~mask].reset_index(drop=True)
-                if "created_time" not in df.columns:
-                    load_errors.append(f"'{spreadsheet_name}/{ws.title}' — no created_time. Cols: {list(df.columns)}")
+                if 'created_time' not in df.columns:
+                    load_errors.append(f"'{spreadsheet_name}/{ws.title}' — no created_time col. Cols: {list(df.columns)}")
                     continue
-                df["created_dt"]   = parse_to_ist(df["created_time"])
-                df["created_time"] = df["created_dt"].dt.strftime("%d-%m-%Y")
-                df["Project"]      = ws.title
-                df["_spreadsheet"] = spreadsheet_name
-                df["campaign_name"] = ws.title
+                df['created_dt'] = parse_to_ist(df['created_time'])
+                df['created_time'] = df['created_dt'].dt.strftime('%d-%m-%Y')
+                df['Project'] = ws.title
+                df['_spreadsheet'] = spreadsheet_name
+                df['campaign_name'] = ws.title
                 for col in df.columns:
-                    if "phone" in col.lower() or "mobile" in col.lower():
-                        df[col] = df[col].astype(str).str.replace(r"^p:", "", regex=True).str.strip()
-                        df[col] = df[col].replace(["nan", "NaN", "None", ""], pd.NA)
-                if "phone" in df.columns and "phone_number" in df.columns:
-                    df["phone"] = df["phone"].fillna(df["phone_number"])
-                    df = df.drop(columns=["phone_number"])
-                elif "phone_number" in df.columns and "phone" not in df.columns:
-                    df = df.rename(columns={"phone_number": "phone"})
-                cols_to_drop = ["id", "ad_id", "ad_name", "adset_id", "adset_name",
-                                "campaign_id", "form_id", "form_name", "is_organic",
-                                "platform", "lead_status", "adset"]
+                    if 'phone' in col.lower() or 'mobile' in col.lower():
+                        df[col] = df[col].astype(str).str.replace(r'^p:', '', regex=True).str.strip()
+                        df[col] = df[col].replace(['nan', 'NaN', 'None', ''], pd.NA)
+                if 'phone' in df.columns and 'phone_number' in df.columns:
+                    df['phone'] = df['phone'].fillna(df['phone_number'])
+                    df = df.drop(columns=['phone_number'])
+                elif 'phone_number' in df.columns and 'phone' not in df.columns:
+                    df = df.rename(columns={'phone_number': 'phone'})
+                cols_to_drop = ['id', 'ad_id', 'ad_name', 'adset_id', 'adset_name',
+                                'campaign_id', 'form_id', 'form_name', 'is_organic',
+                                'platform', 'lead_status', 'adset']
                 df = df.drop(columns=[c for c in cols_to_drop if c in df.columns])
                 all_dfs.append(df)
             except Exception as e:
                 load_errors.append(f"'{spreadsheet_name}/{ws.title}': {e}")
                 continue
 
-    # Show errors in sidebar expander for debugging
     if load_errors:
         with st.sidebar.expander(f"⚠️ Debug ({len(load_errors)} issues)", expanded=True):
             for err in load_errors:
