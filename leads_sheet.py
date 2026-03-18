@@ -1,12 +1,5 @@
 import streamlit as st
 import pandas as pd
-from reportlab.lib.pagesizes import A4, landscape
-from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.lib.units import mm
 from datetime import datetime, timedelta
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
@@ -19,28 +12,13 @@ import zipfile
 from dateutil import parser as dtparser
 from dotenv import load_dotenv
 import re
+import unicodedata as _ud
 
 load_dotenv()
 
-# ── FIX 1: Hindi text shaping ─────────────────────────────────────────────────
-# pip install python-bidi
-try:
-    from bidi.algorithm import get_display as bidi_get_display
-    BIDI_AVAILABLE = True
-except ImportError:
-    BIDI_AVAILABLE = False
-
-import unicodedata as _ud
-
-def shape_indic_text(text):
-    """NFC normalize + bidi passthrough — fixes Hindi/Gujarati rendering in ReportLab."""
-    if not text:
-        return text
-    text = _ud.normalize('NFC', str(text))  # NFC critical for Devanagari conjuncts
-    if BIDI_AVAILABLE:
-        text = bidi_get_display(text)
-    return text
-# ─────────────────────────────────────────────────────────────────────────────
+# ── PDF: fpdf2 (proper Indic/Unicode shaping, replaces reportlab) ─────────────
+# pip install fpdf2
+from fpdf import FPDF
 
 st.set_page_config(page_title="Enacle", page_icon="🏠", layout="wide")
 st.title("Enacle — Leads Report")
@@ -61,96 +39,80 @@ def save_sheet_names(names, auto_fetch):
     with open(SHEETS_CONFIG_FILE, "w") as f:
         json.dump({"sheets": names, "auto_fetch": auto_fetch}, f, indent=2)
 
-FONT_PATH = "NotoSansGujarati-Regular.ttf"
-# FIX 1: Devanagari (Hindi) font path
+# ── Font paths — NotoSans covers Gujarati + Devanagari (Hindi) ───────────────
+# fpdf2 uses a SINGLE font file that supports ALL Unicode — NotoSans covers both
+FONT_PATH            = "NotoSansGujarati-Regular.ttf"
 DEVANAGARI_FONT_PATH = "NotoSansDevanagari-Regular.ttf"
+# Best single font for mixed Gujarati+Hindi+Latin: NotoSans (full Unicode)
+NOTO_FULL_PATH       = "NotoSans-Regular.ttf"
 
 def download_font():
-    # Original Gujarati font download — unchanged
-    if os.path.exists(FONT_PATH) and os.path.getsize(FONT_PATH) > 10000:
-        gujarati_ok = True
-    else:
-        gujarati_ok = False
-        try:
-            urls = [
-                "https://github.com/google/fonts/raw/main/ofl/notosansgujarati/NotoSansGujarati-Regular.ttf",
-                "https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSansGujarati/NotoSansGujarati-Regular.ttf",
-                "https://raw.githubusercontent.com/google/fonts/main/ofl/notosansgujarati/NotoSansGujarati-Regular.ttf",
-            ]
-            for url in urls:
-                try:
-                    r = requests.get(url, timeout=20, headers={"User-Agent": "Mozilla/5.0"})
-                    if r.status_code == 200 and len(r.content) > 10000:
-                        with open(FONT_PATH, "wb") as f:
-                            f.write(r.content)
-                        gujarati_ok = True
-                        break
-                except:
-                    continue
-        except:
-            pass
+    """Download fonts. fpdf2 uses font files directly — no registration needed."""
+    ok = False
 
-    # FIX 1: Download Devanagari font for Hindi
-    if os.path.exists(DEVANAGARI_FONT_PATH) and os.path.getsize(DEVANAGARI_FONT_PATH) > 10000:
-        devanagari_ok = True
+    # 1. Try NotoSans full (covers Latin+Gujarati+Devanagari in one file)
+    if os.path.exists(NOTO_FULL_PATH) and os.path.getsize(NOTO_FULL_PATH) > 10000:
+        ok = True
     else:
-        devanagari_ok = False
-        try:
-            dev_urls = [
-                "https://github.com/google/fonts/raw/main/ofl/notosansdevanagari/NotoSansDevanagari-Regular.ttf",
-                "https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSansDevanagari/NotoSansDevanagari-Regular.ttf",
-                "https://raw.githubusercontent.com/google/fonts/main/ofl/notosansdevanagari/NotoSansDevanagari-Regular.ttf",
-            ]
-            for url in dev_urls:
-                try:
-                    r = requests.get(url, timeout=20, headers={"User-Agent": "Mozilla/5.0"})
-                    if r.status_code == 200 and len(r.content) > 10000:
-                        with open(DEVANAGARI_FONT_PATH, "wb") as f:
-                            f.write(r.content)
-                        devanagari_ok = True
-                        break
-                except:
-                    continue
-        except:
-            pass
+        for url in [
+            "https://github.com/google/fonts/raw/main/ofl/notosans/NotoSans-Regular.ttf",
+            "https://raw.githubusercontent.com/googlefonts/noto-fonts/main/hinted/ttf/NotoSans/NotoSans-Regular.ttf",
+        ]:
+            try:
+                r = requests.get(url, timeout=20, headers={"User-Agent": "Mozilla/5.0"})
+                if r.status_code == 200 and len(r.content) > 10000:
+                    with open(NOTO_FULL_PATH, "wb") as f:
+                        f.write(r.content)
+                    ok = True
+                    break
+            except:
+                continue
 
-    return gujarati_ok or devanagari_ok
+    # 2. Gujarati fallback
+    if not os.path.exists(FONT_PATH) or os.path.getsize(FONT_PATH) < 10000:
+        for url in [
+            "https://github.com/google/fonts/raw/main/ofl/notosansgujarati/NotoSansGujarati-Regular.ttf",
+            "https://raw.githubusercontent.com/google/fonts/main/ofl/notosansgujarati/NotoSansGujarati-Regular.ttf",
+        ]:
+            try:
+                r = requests.get(url, timeout=20, headers={"User-Agent": "Mozilla/5.0"})
+                if r.status_code == 200 and len(r.content) > 10000:
+                    with open(FONT_PATH, "wb") as f:
+                        f.write(r.content)
+                    ok = True
+                    break
+            except:
+                continue
+
+    # 3. Devanagari fallback
+    if not os.path.exists(DEVANAGARI_FONT_PATH) or os.path.getsize(DEVANAGARI_FONT_PATH) < 10000:
+        for url in [
+            "https://github.com/google/fonts/raw/main/ofl/notosansdevanagari/NotoSansDevanagari-Regular.ttf",
+            "https://raw.githubusercontent.com/google/fonts/main/ofl/notosansdevanagari/NotoSansDevanagari-Regular.ttf",
+        ]:
+            try:
+                r = requests.get(url, timeout=20, headers={"User-Agent": "Mozilla/5.0"})
+                if r.status_code == 200 and len(r.content) > 10000:
+                    with open(DEVANAGARI_FONT_PATH, "wb") as f:
+                        f.write(r.content)
+                    ok = True
+                    break
+            except:
+                continue
+
+    return ok
 
 FONT_AVAILABLE = download_font()
 
-# FIX 1: Register both fonts and pick best one based on script detection
-def _register_fonts_and_get_name():
-    """Register Devanagari + Gujarati fonts, return best available font name."""
-    font_name = "Helvetica"
-    if os.path.exists(DEVANAGARI_FONT_PATH):
-        try:
-            pdfmetrics.registerFont(TTFont("DevanagariFont", DEVANAGARI_FONT_PATH))
-            font_name = "DevanagariFont"  # prefer Devanagari as it covers Hindi + Latin
-        except:
-            pass
-    if os.path.exists(FONT_PATH):
-        try:
-            pdfmetrics.registerFont(TTFont("GujaratiFont", FONT_PATH))
-            if font_name == "Helvetica":
-                font_name = "GujaratiFont"
-        except:
-            pass
-    return font_name
-
-def _get_cell_font(text):
-    """FIX 1: Per-cell font detection for Hindi vs Gujarati vs Latin."""
-    s = str(text)
-    has_dev = any('\u0900' <= c <= '\u097F' for c in s)
-    has_guj = any('\u0A80' <= c <= '\u0AFF' for c in s)
-    if has_dev and os.path.exists(DEVANAGARI_FONT_PATH):
-        return "DevanagariFont"
-    if has_guj and os.path.exists(FONT_PATH):
-        return "GujaratiFont"
-    if os.path.exists(DEVANAGARI_FONT_PATH):
-        return "DevanagariFont"
-    if os.path.exists(FONT_PATH):
-        return "GujaratiFont"
-    return "Helvetica"
+def _best_font_path():
+    """Return path to best available font file for fpdf2."""
+    if os.path.exists(NOTO_FULL_PATH) and os.path.getsize(NOTO_FULL_PATH) > 10000:
+        return NOTO_FULL_PATH
+    if os.path.exists(FONT_PATH) and os.path.getsize(FONT_PATH) > 10000:
+        return FONT_PATH
+    if os.path.exists(DEVANAGARI_FONT_PATH) and os.path.getsize(DEVANAGARI_FONT_PATH) > 10000:
+        return DEVANAGARI_FONT_PATH
+    return None
 
 def normalize_unicode(text):
     import unicodedata
@@ -186,8 +148,6 @@ def clean_html(text):
         return ''
     if re.match(r"^['\"]?[-_]+['\"]?$", text):
         return ''
-    # FIX 1: Apply Indic shaping so ReportLab renders Hindi correctly
-    text = shape_indic_text(text)
     return text
 
 def clean_col_name(col):
@@ -196,96 +156,95 @@ def clean_col_name(col):
     return col
 
 def generate_pdf(df, report_date, title="Leads Report"):
-    buffer = io.BytesIO()
+    """
+    Generate PDF using fpdf2 — proper Unicode/Indic shaping.
+    fpdf2 uses the font file's built-in shaping, so Gujarati & Hindi render correctly.
+    pip install fpdf2
+    """
+    # Page: A4 landscape
+    pdf = FPDF(orientation='L', unit='mm', format='A4')
+    pdf.add_page()
+    pdf.set_auto_page_break(auto=True, margin=10)
 
-    # FIX 1: Use new font registration helper
-    font_name = "Helvetica"
-    if FONT_AVAILABLE:
-        font_name = _register_fonts_and_get_name()
+    # Load font — fpdf2 handles Unicode shaping natively via the TTF file
+    font_path = _best_font_path()
+    if font_path:
+        pdf.add_font("NotoSans", style="", fname=font_path)
+        font_name = "NotoSans"
+    else:
+        font_name = "Helvetica"
 
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=landscape(A4),
-        rightMargin=8*mm,
-        leftMargin=8*mm,
-        topMargin=10*mm,
-        bottomMargin=10*mm
-    )
+    PAGE_W = 277  # A4 landscape width mm (297 - 10 margin each side)
+    L_MARGIN = 10
+    pdf.set_left_margin(L_MARGIN)
+    pdf.set_right_margin(L_MARGIN)
 
-    title_style = ParagraphStyle('CustomTitle', fontName=font_name, fontSize=16, alignment=1, spaceAfter=8, textColor=colors.HexColor('#1a1a2e'))
-    subtitle_style = ParagraphStyle('Subtitle', fontName=font_name, fontSize=11, alignment=1, spaceAfter=4, textColor=colors.HexColor('#555555'))
-    header_style = ParagraphStyle('Header', fontName=font_name, fontSize=10, alignment=1, leading=13, textColor=colors.white)
-    cell_style = ParagraphStyle('Cell', fontName=font_name, fontSize=9, alignment=1, leading=12, textColor=colors.HexColor('#222222'))
+    # ── Title ──────────────────────────────────────────────────────────────────
+    pdf.set_font(font_name, size=16)
+    pdf.set_text_color(26, 26, 46)      # #1a1a2e
+    title_clean = clean_html(title)
+    pdf.cell(PAGE_W, 10, title_clean, align='C', new_x="LMARGIN", new_y="NEXT")
 
-    elements = []
-    elements.append(Paragraph(clean_html(title), title_style))
-    elements.append(Paragraph(f"Date: {report_date}   |   Total Leads: {len(df)}", subtitle_style))
-    elements.append(Spacer(1, 4*mm))
+    # ── Subtitle ───────────────────────────────────────────────────────────────
+    pdf.set_font(font_name, size=11)
+    pdf.set_text_color(85, 85, 85)
+    pdf.cell(PAGE_W, 7, f"Date: {report_date}   |   Total Leads: {len(df)}",
+             align='C', new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(4)
 
-    if not df.empty:
-        clean_cols = [clean_col_name(c) for c in df.columns]
-        header_row = [Paragraph(c, header_style) for c in clean_cols]
-        data_rows = []
-        for _, row in df.iterrows():
-            cells = []
-            for v in row:
-                cell_text = clean_html(v)
-                # FIX 1: Per-cell font so Hindi cells use DevanagariFont automatically
-                cell_font = _get_cell_font(cell_text)
-                if cell_font != font_name:
-                    per_cell_style = ParagraphStyle(
-                        f'Cell_{cell_font}', fontName=cell_font,
-                        fontSize=9, alignment=1, leading=12,
-                        textColor=colors.HexColor('#222222')
-                    )
-                    cells.append(Paragraph(cell_text, per_cell_style))
-                else:
-                    cells.append(Paragraph(cell_text, cell_style))
-            data_rows.append(cells)
+    if df.empty:
+        return bytes(pdf.output())
 
-        table_data = [header_row] + data_rows
-        page_w = landscape(A4)[0] - 16*mm
+    # ── Column widths ──────────────────────────────────────────────────────────
+    raw_widths = []
+    for col in df.columns:
+        c = col.lower()
+        if any(x in c for x in ['date', 'time']):      raw_widths.append(22)
+        elif any(x in c for x in ['phone', 'mobile']): raw_widths.append(32)
+        elif 'name' in c:                               raw_widths.append(35)
+        elif not col.isascii():                         raw_widths.append(40)
+        else:                                           raw_widths.append(26)
+    total = sum(raw_widths)
+    col_widths = [w * PAGE_W / total for w in raw_widths]
 
-        raw_widths = []
-        for col in df.columns:
-            c = col.lower()
-            if any(x in c for x in ['date', 'time']):
-                raw_widths.append(20)
-            elif any(x in c for x in ['phone', 'mobile']):
-                raw_widths.append(28)
-            elif 'name' in c:
-                raw_widths.append(30)
-            elif not col.isascii():
-                raw_widths.append(38)
-            else:
-                raw_widths.append(24)
+    ROW_H = 8   # mm per row
 
-        total = sum(raw_widths)
-        col_widths = [w * page_w / total for w in raw_widths]
+    # ── Header row ─────────────────────────────────────────────────────────────
+    pdf.set_fill_color(52, 73, 94)      # #34495e
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font(font_name, size=9)
+    for col, w in zip(df.columns, col_widths):
+        pdf.cell(w, ROW_H + 2, clean_col_name(col), border=0,
+                 align='C', fill=True)
+    pdf.ln()
 
-        table = Table(table_data, colWidths=col_widths, repeatRows=1)
-        table.setStyle(TableStyle([
-            ('BACKGROUND',    (0, 0), (-1, 0),  colors.HexColor('#34495e')),
-            ('TEXTCOLOR',     (0, 0), (-1, 0),  colors.white),
-            ('ALIGN',         (0, 0), (-1, -1), 'CENTER'),
-            ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
-            ('FONTNAME',      (0, 0), (-1, -1), font_name),
-            ('FONTSIZE',      (0, 0), (-1, 0),  10),
-            ('FONTSIZE',      (0, 1), (-1, -1), 9),
-            ('TOPPADDING',    (0, 0), (-1, 0),  8),
-            ('BOTTOMPADDING', (0, 0), (-1, 0),  8),
-            ('TOPPADDING',    (0, 1), (-1, -1), 7),
-            ('BOTTOMPADDING', (0, 1), (-1, -1), 7),
-            ('LEFTPADDING',   (0, 0), (-1, -1), 3),
-            ('RIGHTPADDING',  (0, 0), (-1, -1), 3),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f5f5f5'), colors.white]),
-            ('GRID',          (0, 0), (-1, -1), 0.4, colors.HexColor('#cccccc')),
-            ('LINEBELOW',     (0, 0), (-1, 0),  1,   colors.HexColor('#2c3e50')),
-        ]))
-        elements.append(table)
+    # ── Data rows ──────────────────────────────────────────────────────────────
+    pdf.set_font(font_name, size=8)
+    fill_colors = [(245, 245, 245), (255, 255, 255)]   # alternating rows
+    for i, (_, row) in enumerate(df.iterrows()):
+        r, g, b = fill_colors[i % 2]
+        pdf.set_fill_color(r, g, b)
+        pdf.set_text_color(34, 34, 34)
 
-    doc.build(elements)
-    return buffer.getvalue()
+        # Calculate max lines needed for this row (for multi-line cells)
+        row_values = [clean_html(str(v)) for v in row]
+
+        for val, w in zip(row_values, col_widths):
+            x_before = pdf.get_x()
+            y_before = pdf.get_y()
+            # multi_cell handles text wrapping; move back to same y after
+            pdf.multi_cell(w, ROW_H, val, border='LR',
+                           align='C', fill=True, new_x="RIGHT", new_y="TOP")
+            pdf.set_xy(x_before + w, y_before)
+
+        pdf.ln(ROW_H)
+
+        # Bottom border for each row
+        pdf.set_draw_color(204, 204, 204)
+        pdf.line(L_MARGIN, pdf.get_y(), L_MARGIN + PAGE_W, pdf.get_y())
+
+    return bytes(pdf.output())
+
 
 
 # FIX 2: Multi-format date parser — original parse_to_ist logic unchanged,
