@@ -436,6 +436,12 @@ if current_names:
     for n in current_names:
         st.sidebar.markdown(f"• {n}")
 
+# Font status indicator in sidebar
+st.sidebar.divider()
+st.sidebar.markdown("**🔤 Font Status:**")
+st.sidebar.markdown(f"{'✅' if FONT_AVAILABLE else '❌'} Gujarati Font")
+st.sidebar.markdown(f"{'✅' if HINDI_FONT_AVAILABLE else '❌'} Hindi Font")
+
 # ── Main ──────────────────────────────────────────────────
 ist = pytz.timezone('Asia/Kolkata')
 now_ist = datetime.now(ist)
@@ -521,10 +527,10 @@ if st.button("🚀 Generate & Save Leads Report", use_container_width=True):
                             non_empty_cols = [col for col in pdf_df.columns
                                               if pdf_df[col].replace('', pd.NA).notna().any()]
                             pdf_df = pdf_df[non_empty_cols]
-                            priority_cols = ['full_name', 'phone']
-                            other_cols = [col for col in pdf_df.columns if col not in priority_cols]
-                            existing_priority = [col for col in priority_cols if col in pdf_df.columns]
-                            pdf_df = pdf_df[other_cols + existing_priority]
+                            last_cols = ['full_name', 'phone']
+                            other_cols = [col for col in pdf_df.columns if col not in last_cols]
+                            existing_last = [col for col in last_cols if col in pdf_df.columns]
+                            pdf_df = pdf_df[other_cols + existing_last]
                             pdf_bytes = generate_pdf(pdf_df, date_label, project_name)
                         except Exception as pdf_err:
                             st.warning(f"PDF error {project_name}: {pdf_err}")
