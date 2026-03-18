@@ -157,108 +157,154 @@ def clean_col_name(col):
 
 def generate_pdf(df, report_date, title="Leads Report"):
     """
-    Generate PDF using fpdf2 — proper Unicode/Indic shaping.
-    fpdf2 uses the font file's built-in shaping, so Gujarati & Hindi render correctly.
-    pip install fpdf2
+    HTML → PDF via weasyprint — full browser-level Unicode/Gujarati/Hindi shaping.
+    pip install weasyprint
+    Font files (NotoSans*.ttf) must exist in the working directory.
     """
-    # Page: A4 landscape
-    pdf = FPDF(orientation='L', unit='mm', format='A4')
-    pdf.add_page()
-    pdf.set_auto_page_break(auto=True, margin=10)
+    import base64
 
-    # Load font — fpdf2 handles Unicode shaping natively via the TTF file
-    font_path = _best_font_path()
-    if font_path:
-        pdf.add_font("NotoSans", style="", fname=font_path)
-        font_name = "NotoSans"
-    else:
-        font_name = "Helvetica"
+    # ── Build font CSS (@font-face) ────────────────────────────────────────────
+    font_css = ""
+    font_family = "Arial, sans-serif"
 
-    PAGE_W = 277  # A4 landscape width mm (297 - 10 margin each side)
-    L_MARGIN = 10
-    pdf.set_left_margin(L_MARGIN)
-    pdf.set_right_margin(L_MARGIN)
+    def font_b64(path):
+        with open(path, "rb") as f:
+            return base64.b64encode(f.read()).decode()
 
-    # ── Title ──────────────────────────────────────────────────────────────────
-    pdf.set_font(font_name, size=16)
-    pdf.set_text_color(26, 26, 46)      # #1a1a2e
-    title_clean = clean_html(title)
-    pdf.cell(PAGE_W, 10, title_clean, align='C', new_x="LMARGIN", new_y="NEXT")
+    noto_paths = [
+        ("NotoSansGujarati", FONT_PATH),
+        ("NotoSansDevanagari", DEVANAGARI_FONT_PATH),
+        ("NotoSans", NOTO_FULL_PATH),
+    ]
+    loaded = []
+    for fname, fpath in noto_paths:
+        if os.path.exists(fpath) and os.path.getsize(fpath) > 10000:
+            b64 = font_b64(fpath)
+            font_css += f"""
+@font-face {{
+    font-family: '{fname}';
+    src: url('data:font/truetype;base64,{b64}') format('truetype');
+}}"""
+            loaded.append(fname)
 
-    # ── Subtitle ───────────────────────────────────────────────────────────────
-    pdf.set_font(font_name, size=11)
-    pdf.set_text_color(85, 85, 85)
-    pdf.cell(PAGE_W, 7, f"Date: {report_date}   |   Total Leads: {len(df)}",
-             align='C', new_x="LMARGIN", new_y="NEXT")
-    pdf.ln(4)
+    if loaded:
+        font_family = ", ".join(f"'{f}'" for f in loaded) + ", Arial, sans-serif"
 
-    if df.empty:
-        return bytes(pdf.output())
-
-    # ── Column widths ──────────────────────────────────────────────────────────
+    # ── Column width percentages ───────────────────────────────────────────────
     raw_widths = []
     for col in df.columns:
         c = col.lower()
-        if any(x in c for x in ['date', 'time']):      raw_widths.append(22)
-        elif any(x in c for x in ['phone', 'mobile']): raw_widths.append(32)
-        elif 'name' in c:                               raw_widths.append(35)
-        elif not col.isascii():                         raw_widths.append(40)
-        else:                                           raw_widths.append(26)
+        if any(x in c for x in ['date', 'time']):       raw_widths.append(22)
+        elif any(x in c for x in ['phone', 'mobile']):  raw_widths.append(32)
+        elif 'name' in c:                                raw_widths.append(35)
+        elif not col.isascii():                          raw_widths.append(40)
+        else:                                            raw_widths.append(26)
     total = sum(raw_widths)
-    col_widths = [w * PAGE_W / total for w in raw_widths]
+    col_pcts = [f"{w*100/total:.2f}%" for w in raw_widths]
 
-    ROW_H = 8   # mm per row
+    # ── Build HTML table ───────────────────────────────────────────────────────
+    # Header
+    header_cells = "".join(
+        f'<th style="width:{pct}">{clean_col_name(col)}</th>'
+        for col, pct in zip(df.columns, col_pcts)
+    )
 
-    # ── Header row ─────────────────────────────────────────────────────────────
-    pdf.set_fill_color(52, 73, 94)      # #34495e
-    pdf.set_text_color(255, 255, 255)
-    pdf.set_font(font_name, size=9)
-    for col, w in zip(df.columns, col_widths):
-        pdf.cell(w, ROW_H + 2, clean_col_name(col), border=0,
-                 align='C', fill=True)
-    pdf.ln()
-
-    # ── Data rows ──────────────────────────────────────────────────────────────
-    pdf.set_font(font_name, size=8)
-    fill_colors = [(245, 245, 245), (255, 255, 255)]   # alternating rows
+    # Rows
+    row_html = ""
     for i, (_, row) in enumerate(df.iterrows()):
-        r, g, b = fill_colors[i % 2]
-        pdf.set_fill_color(r, g, b)
-        pdf.set_text_color(34, 34, 34)
+        bg = "#f5f5f5" if i % 2 == 0 else "#ffffff"
+        cells = "".join(
+            f'<td>{clean_html(str(v))}</td>' for v in row
+        )
+        row_html += f'<tr style="background:{bg}">{cells}</tr>\n'
 
-        # Calculate max lines needed for this row (for multi-line cells)
-        row_values = [clean_html(str(v)) for v in row]
+    html = f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+{font_css}
 
-        for val, w in zip(row_values, col_widths):
-            x_before = pdf.get_x()
-            y_before = pdf.get_y()
-            # multi_cell handles text wrapping; move back to same y after
-            pdf.multi_cell(w, ROW_H, val, border='LR',
-                           align='C', fill=True, new_x="RIGHT", new_y="TOP")
-            pdf.set_xy(x_before + w, y_before)
+* {{ margin: 0; padding: 0; box-sizing: border-box; }}
 
-        pdf.ln(ROW_H)
+@page {{
+    size: A4 landscape;
+    margin: 10mm 10mm 10mm 10mm;
+}}
 
-        # Bottom border for each row
-        pdf.set_draw_color(204, 204, 204)
-        pdf.line(L_MARGIN, pdf.get_y(), L_MARGIN + PAGE_W, pdf.get_y())
+body {{
+    font-family: {font_family};
+    font-size: 9pt;
+    color: #222;
+}}
 
-    return bytes(pdf.output())
+.title {{
+    text-align: center;
+    font-size: 16pt;
+    color: #1a1a2e;
+    margin-bottom: 3mm;
+    font-family: {font_family};
+}}
 
+.subtitle {{
+    text-align: center;
+    font-size: 11pt;
+    color: #555555;
+    margin-bottom: 5mm;
+    font-family: {font_family};
+}}
 
+table {{
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-family: {font_family};
+}}
 
-# FIX 2: Multi-format date parser — original parse_to_ist logic unchanged,
-# sirf _try_formats() helper add karyu che jo explicit formats try kare che
-_DATE_FMTS = [
-    '%Y-%m-%dT%H:%M:%S.%f', '%Y-%m-%dT%H:%M:%S',
-    '%Y-%m-%d %H:%M:%S.%f', '%Y-%m-%d %H:%M:%S',
-    '%Y-%m-%d',
-    '%d-%m-%Y %H:%M:%S',    '%d-%m-%Y',
-    '%d/%m/%Y %H:%M:%S',    '%d/%m/%Y',
-    '%m/%d/%Y %H:%M:%S',    '%m/%d/%Y',
-    '%d %b %Y',             '%d %B %Y',
-    '%b %d, %Y',            '%B %d, %Y',
-]
+thead tr {{
+    background: #34495e;
+    color: #ffffff;
+}}
+
+thead th {{
+    padding: 4pt 3pt;
+    font-size: 9pt;
+    text-align: center;
+    font-weight: bold;
+    word-break: break-word;
+    font-family: {font_family};
+}}
+
+tbody td {{
+    padding: 4pt 3pt;
+    font-size: 8pt;
+    text-align: center;
+    border-bottom: 0.4pt solid #cccccc;
+    word-break: break-word;
+    font-family: {font_family};
+}}
+</style>
+</head>
+<body>
+<div class="title">{clean_html(title)}</div>
+<div class="subtitle">Date: {report_date} &nbsp;|&nbsp; Total Leads: {len(df)}</div>
+<table>
+<thead><tr>{header_cells}</tr></thead>
+<tbody>{row_html}</tbody>
+</table>
+</body>
+</html>"""
+
+    # ── HTML → PDF ─────────────────────────────────────────────────────────────
+    try:
+        from weasyprint import HTML as WP_HTML
+        buf = io.BytesIO()
+        WP_HTML(string=html).write_pdf(buf)
+        return buf.getvalue()
+    except ImportError:
+        # Fallback: return HTML as-is (for debugging if weasyprint not installed)
+        return html.encode('utf-8')
+
 
 def _try_formats(s):
     """Try explicit date formats before falling back to dateutil."""
