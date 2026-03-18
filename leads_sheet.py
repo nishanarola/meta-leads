@@ -436,11 +436,6 @@ if current_names:
     for n in current_names:
         st.sidebar.markdown(f"• {n}")
 
-# Font status indicator in sidebar
-st.sidebar.divider()
-st.sidebar.markdown("**🔤 Font Status:**")
-st.sidebar.markdown(f"{'✅' if FONT_AVAILABLE else '❌'} Gujarati Font")
-st.sidebar.markdown(f"{'✅' if HINDI_FONT_AVAILABLE else '❌'} Hindi Font")
 
 # ── Main ──────────────────────────────────────────────────
 ist = pytz.timezone('Asia/Kolkata')
